@@ -30,3 +30,5 @@ Mapping for VCVRack MIDI > Gate module:
 To Do: Save & Load 16 sets of pattern-banks.
 
 Map Save & Load buttons to remaining bottom row slots. Use Row 6 & 7 for pattern-bank selection.
+
+FAR from perfect. Open to improvements - throw me a pull request.
