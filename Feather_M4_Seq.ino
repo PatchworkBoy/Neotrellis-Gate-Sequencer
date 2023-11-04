@@ -2,7 +2,19 @@
  * Feather M4 Seq -- An 8 track 32 step MIDI Gate Sequencer for Feather M4 Express & Neotrellis 8x8
  * 04 Nov 2023 - @apatchworkboy / Marci
  * 28 Apr 2023 - original via @todbot / Tod Kurt https://github.com/todbot/picostepseq/
- */
+ *
+ * Libraries needed (all available via Library Manager):
+ * - Adafruit_TinyUSB -- https://github.com/adafruit/Adafruit_TinyUSB_Arduino
+ * - MIDI -- https://github.com/FortySevenEffects/arduino_midi_library
+ * - Adafruit NeoTrellis -- part of Adafruit SeeSaw -- https://github.com/adafruit/Adafruit_Seesaw
+ * - ArduinoJson -- https://arduinojson.org/
+ *
+ * To upload:
+ * - Use Arduino IDE 1.8.19
+ * - In "Tools", set "Tools / USB Stack: Adafruit TinyUSB"
+ * - Program the sketch to the Feather M4 Express with "Upload"
+ *
+ **/
 
 #include <Adafruit_TinyUSB.h>
 #include <Adafruit_NeoTrellis.h>
