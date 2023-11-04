@@ -147,54 +147,51 @@ public:
   // Trigger step in sequence, when internally clocked
   //void trigger(uint32_t now, uint16_t delta_t) {
   void trigger(uint32_t now_micros, uint16_t delta_t) {
-    if( !playing ) { return; }
+    if( !playing ) { trellis.show(); return; }
     trellis.show();
     (void)delta_t; // silence unused variable
     stepi = (stepi + 1) % numsteps; // go to next step
     currstep = stepi;
+    laststep = stepi - 1 < 0 ? numsteps - 1 : stepi - 1;
 
     int color = 0;
     int hit = 0;
     switch (editing) {
       case 1:
         hit = seq1[stepi] > 0 ? PURPLE : W100;
-        color = seq1[stepi - 1] > 0 ? RED : W10;
+        color = seq1[laststep] > 0 ? RED : W10;
         break;
       case 2:
         hit = seq2[stepi] > 0 ? PURPLE : W100;
-        color = seq2[stepi - 1] > 0 ? ORANGE : W10;
+        color = seq2[laststep] > 0 ? ORANGE : W10;
         break;
       case 3:
         hit = seq3[stepi] > 0 ? PURPLE : W100;
-        color = seq3[stepi - 1] > 0 ? YELLOW : W10;
+        color = seq3[laststep] > 0 ? YELLOW : W10;
         break;
       case 4:
         hit = seq4[stepi] > 0 ? PURPLE : W100;
-        color = seq4[stepi - 1] > 0 ? GREEN : W10;
+        color = seq4[laststep] > 0 ? GREEN : W10;
         break;
       case 5:
         hit = seq5[stepi] > 0 ? PURPLE : W100;
-        color = seq5[stepi - 1] > 0 ? CYAN : W10;
+        color = seq5[laststep] > 0 ? CYAN : W10;
         break;
       case 6:
         hit = seq6[stepi] > 0 ? PURPLE : W100;
-        color = seq6[stepi - 1] > 0 ? BLUE : W10;
+        color = seq6[laststep] > 0 ? BLUE : W10;
         break;
       case 7:
         hit = seq7[stepi] > 0 ? CYAN : W100;
-        color = seq7[stepi - 1] > 0 ? PURPLE : W10;
+        color = seq7[laststep] > 0 ? PURPLE : W10;
         break;
       case 8:
         hit = seq8[stepi] > 0 ? BLUE : W100;
-        color = seq8[stepi - 1] > 0 ? PINK : W10;
+        color = seq8[laststep] > 0 ? PINK : W10;
         break;
     }
     trellis.setPixelColor(stepi,hit);
-    if (stepi - 1 < 0){
-      trellis.setPixelColor(numsteps - 1, color);
-    } else {
-      trellis.setPixelColor(stepi - 1, color);
-    }
+    trellis.setPixelColor(laststep, color);
     
     on_func(36, 127, 5, seq1[stepi] == 1 ? true : false);
     on_func(37, 127, 5, seq2[stepi] == 1 ? true : false);
@@ -211,12 +208,15 @@ public:
   }
 
   void toggle_play_stop() {
-    if( playing ) { 
+    if( playing ) {
+      clear_pos(stepi); 
       stop(); 
       on_func(49, 127, 5, true);
+      on_func(51, 127, 5, true);
     }
     else { 
-      play(); 
+      play();
+      on_func(51, 127, 5, true);
       on_func(48, 127, 5, true);
     }
   }
@@ -244,6 +244,7 @@ public:
   // signal to sequencer/MIDI core we want to stop playing
   void stop() {
     playing = false;
+    clear_pos(stepi);
     stepi = -1;
     if(send_clock && !extclk_micros) {
       clk_func( STOP );
@@ -256,5 +257,38 @@ public:
     stepi = -1;
     ticki = 0;
     on_func(51, 127, 5, true);
+  }
+
+  void clear_pos(int stepi) {
+    int color = 0;
+    int hit = 0;
+    switch (editing) {
+      case 1:
+        hit = seq1[stepi] > 0 ? RED : W10;
+        break;
+      case 2:
+        hit = seq2[stepi] > 0 ? ORANGE : W10;
+        break;
+      case 3:
+        hit = seq3[stepi] > 0 ? YELLOW : W10; 
+        break;
+      case 4:
+        hit = seq4[stepi] > 0 ? GREEN : W10;
+        break;
+      case 5:
+        hit = seq5[stepi] > 0 ? CYAN : W10;
+        break;
+      case 6:
+        hit = seq6[stepi] > 0 ? BLUE : W10;
+        break;
+      case 7:
+        hit = seq7[stepi] > 0 ? PURPLE : W10;
+        break;
+      case 8:
+        hit = seq8[stepi] > 0 ? PINK : W10;
+        break;
+    }
+    trellis.setPixelColor(stepi,hit);
+    trellis.show();
   }
 };

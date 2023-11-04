@@ -2,20 +2,7 @@
  * Feather M4 Seq -- An 8 track 32 step MIDI Gate Sequencer for Feather M4 Express & Neotrellis 8x8
  * 04 Nov 2023 - @apatchworkboy / Marci
  * 28 Apr 2023 - original via @todbot / Tod Kurt https://github.com/todbot/picostepseq/
- *
- * Libraries needed (all available via Library Manager):
- * - Adafruit_TinyUSB -- https://github.com/adafruit/Adafruit_TinyUSB_Arduino
- * - MIDI -- https://github.com/FortySevenEffects/arduino_midi_library
- * - Adafruit NeoTrellis -- part of Adafruit SeeSaw -- https://github.com/adafruit/Adafruit_Seesaw
- * - ArduinoJson -- https://arduinojson.org/
- *
- * To upload:
- * - Use Arduino IDE 1.8.19
- * - In "Tools", set "Tools / USB Stack: Adafruit TinyUSB"
- * - Program the sketch to the Feather M4 Express with "Upload"
- *
- **/
- 
+ */
 
 #include <Adafruit_TinyUSB.h>
 #include <Adafruit_NeoTrellis.h>
@@ -38,8 +25,10 @@
 #define OFF seesaw_NeoPixel::Color(0,0,0)
 #define W100 seesaw_NeoPixel::Color(100,100,100)
 #define W75 seesaw_NeoPixel::Color(75,75,75)
-#define W10 seesaw_NeoPixel::Color(10,10,10)
+#define W10 seesaw_NeoPixel::Color(1,1,1)
 #define PURPLE seesaw_NeoPixel::Color(100,20,155)
+
+int r, g, b = 0;
 
 Adafruit_NeoTrellis t_array[Y_DIM / 4][X_DIM / 4] = {
 
@@ -99,6 +88,7 @@ int seq8[] = {
   1, 1, 1, 1, 1, 1, 1, 1
 };
 int currstep = 0;
+int laststep = 0;
 int editing = 1;
 
 #include "Sequencer.h"
@@ -121,7 +111,8 @@ Config cfg  = {
 };
 
 const bool midi_out_debug = false;
-const bool midi_in_debug = true;
+const bool midi_in_debug = false;
+const bool marci_debug = false;
 
 const int numseqs = 8;
 
@@ -307,7 +298,7 @@ void show_sequence(int seq) {
 TrellisCallback onKey(keyEvent evt) {
   auto const now = millis();
   auto const keyId = evt.bit.NUM;
-  Serial.println(keyId);
+  if (marci_debug) {Serial.println(keyId);}
   switch (evt.bit.EDGE)
   {
     case SEESAW_KEYPAD_EDGE_RISING:
@@ -475,30 +466,22 @@ TrellisCallback onKey(keyEvent evt) {
   return nullptr;
 }
 
-////////////////////////////
-
-//
-// ---  MIDI in/out setup on core0
-//
-void setup() {
-  TinyUSBDevice.setManufacturerDescriptor("todbot");
-  TinyUSBDevice.setProductDescriptor("PicoStepSeq");
-
-  MIDIusb.begin();
-  MIDIusb.turnThruOff();   // turn off echo
-
-  Serial.begin(115200);
-
-  sequences_read();
-  sequence_load(2);
-  configure_sequencer();
-
-  if (!trellis.begin()) {
-    Serial.println("failed to begin trellis");
-    while (1) delay(1);
-  } else {
-    Serial.println("Init..."); 
+void theaterChase(uint32_t c, uint8_t wait) {
+  for (int j = 0; j < 10; j++) { //do 10 cycles of chasing
+    for (int q = 0; q < 3; q++) {
+      for (uint16_t i = 0; i < t_size; i = i + 3) {
+        trellis.setPixelColor(i + q, c); //turn every third pixel on
+      }
+      trellis.show();
+      delay(wait);
+      for (uint16_t i = 0; i < t_size; i = i + 3) {
+        trellis.setPixelColor(i + q, maincolor); //turn every third pixel off
+      }
+    }
   }
+}
+
+void init_interface(){
   //Seq 1 > 8
   trellis.setPixelColor(32,RED);
   trellis.setPixelColor(33,ORANGE);
@@ -524,6 +507,41 @@ void setup() {
       trellis.registerCallback(x, y, onKey);
     }
   }
+  trellis.show();
+}
+
+////////////////////////////
+
+//
+// ---  MIDI in/out setup on core0
+//
+void setup() {
+  TinyUSBDevice.setManufacturerDescriptor("aPatchworkBoy");
+  TinyUSBDevice.setProductDescriptor("M4StepSeq");
+
+  MIDIusb.begin();
+  MIDIusb.turnThruOff();   // turn off echo
+
+  Serial.begin(115200);
+
+  sequences_read();
+  sequence_load(2);
+  configure_sequencer();
+  delay(100);
+  if (!trellis.begin()) {
+    Serial.println("failed to begin trellis");
+    while (1) delay(1);
+  } else {
+    Serial.println("Init..."); 
+  }
+  
+  randomSeed(analogRead(0));
+  r = random(0, 256);
+  g = random(0, 256);
+  b = random(0, 256);
+  theaterChase(seesaw_NeoPixel::Color(r, g, b), 50);
+  init_interface();
+  Serial.println("GO!"); 
   show_sequence(1);
 }
 
