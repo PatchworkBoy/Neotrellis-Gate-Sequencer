@@ -12,7 +12,8 @@ NeoTrellis Surface...
 - Bottom row: Toggle Play/Stop | Stop | Pause (iffy, don't bother) | Reset | - | - | Tempo down | Tempo up
 
 Outputs self-generated MIDI Clock (24 PPQN), Play/Stop/Cont (ideal for use in VCV rack with MIDI > CV module)
-- Default BPM: 120
+- Default BPM: 120, adjustable via Tempo down / up buttons in -/+ 1 increments
+- OR can be driven with a 24PPQN external midi clock (eg: Impromptu Clocked x24 to CV>MIDI clock)
 
 Mapping for VCVRack MIDI > Gate module:
 - Trk1: Note C2 (36)
