@@ -1,10 +1,10 @@
 # Neotrellis-Trigger-Sequencer
-An 8 track 32 step MIDI (over USB) gate/trigger sequencer for Feather M4 Express / Neotrellis 8x8
+An 8 track 32 step MIDI (over USB) gate/trigger sequencer and MIDI Clock Generator for Feather M4 Express / Neotrellis 8x8
 Adapted from https://github.com/todbot/picostepseq/
 
-Designed for use with the Adafruit 8x8 Neotrellis Feather M4 Kit - 
-- https://www.adafruit.com/product/1929
-- https://thepihut.com/products/adafruit-untztrument-open-source-8x8-grid-controller-kit-8x8-white-leds
+Designed for use with the Adafruit 8x8 Neotrellis Feather M4 Kit, no additional hardware required - 
+- US:  https://www.adafruit.com/product/1929
+- UK: https://thepihut.com/products/adafruit-untztrument-open-source-8x8-grid-controller-kit-8x8-white-leds
 
 NeoTrellis Surface...
 - Row 1 - 4: Steps 1 thru 32
