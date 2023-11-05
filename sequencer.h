@@ -101,18 +101,18 @@ public:
     // if we have a held note and it's time to turn it off, turn it off
     if( held_gate_millis != 0 && millis() >= held_gate_millis ) {
       held_gate_millis = 0;
-      off_func( 36, 127, 5, true);
-      off_func( 37, 127, 5, true);
-      off_func( 38, 127, 5, true);
-      off_func( 39, 127, 5, true);
-      off_func( 40, 127, 5, true);
-      off_func( 41, 127, 5, true);
-      off_func( 42, 127, 5, true);
-      off_func( 43, 127, 5, true);
-      off_func( 48, 127, 5, true);
-      off_func( 49, 127, 5, true);
-      off_func( 50, 127, 5, true);
-      off_func( 51, 127, 5, true);
+      off_func( track_notes[0], 0, 1, true);
+      off_func( track_notes[1], 0, 1, true);
+      off_func( track_notes[2], 0, 1, true);
+      off_func( track_notes[3], 0, 1, true);
+      off_func( track_notes[4], 0, 1, true);
+      off_func( track_notes[5], 0, 1, true);
+      off_func( track_notes[6], 0, 1, true);
+      off_func( track_notes[7], 0, 1, true);
+      off_func( ctrl_notes[0], 0, 1, true);
+      off_func( ctrl_notes[1], 0, 1, true);
+      off_func( ctrl_notes[2], 0, 1, true);
+      off_func( ctrl_notes[3], 0, 1, true);
     }
 
     if( send_clock && playing && !extclk_micros ) {
@@ -157,6 +157,8 @@ public:
     int color = 0;
     int hit = 0;
     switch (editing) {
+      case 0:
+        break;
       case 1:
         hit = seq1[stepi] > 0 ? PURPLE : W100;
         color = seq1[laststep] > 0 ? RED : W10;
@@ -189,18 +191,162 @@ public:
         hit = seq8[stepi] > 0 ? BLUE : W100;
         color = seq8[laststep] > 0 ? PINK : W10;
         break;
+      default:
+        break;
+    }
+    switch (velocity) {
+      case 0:
+        break;
+      case 1:
+        hit = seq1[stepi] > 0 ? PURPLE : W100;
+        switch (vel1[laststep]){
+          case 0:
+            color = W10;
+            break;
+          case 40:
+            color = R40;
+            break;
+          case 80:
+            color = R80;
+            break;
+          case 127:
+            color = R127;
+            break;
+        }
+        break;
+      case 2:
+        hit = seq2[stepi] > 0 ? PURPLE : W100;
+        switch (vel2[laststep]){
+          case 0:
+            color = W10;
+            break;
+          case 40:
+            color = O40;
+            break;
+          case 80:
+            color = O80;
+            break;
+          case 127:
+            color = O127;
+            break;
+        }
+        break;
+      case 3:
+        hit = seq3[stepi] > 0 ? PURPLE : W100;
+        switch (vel3[laststep]){
+          case 0:
+            color = W10;
+            break;
+          case 40:
+            color = Y40;
+            break;
+          case 80:
+            color = Y80;
+            break;
+          case 127:
+            color = Y127;
+            break;
+        }
+        break;
+      case 4:
+        hit = seq4[stepi] > 0 ? PURPLE : W100;
+        switch (vel4[laststep]){
+          case 0:
+            color = W10;
+            break;
+          case 40:
+            color = G40;
+            break;
+          case 80:
+            color = G80;
+            break;
+          case 127:
+            color = G127;
+            break;
+        }
+        break;
+      case 5:
+        hit = seq5[stepi] > 0 ? PURPLE : W100;
+        switch (vel5[laststep]){
+          case 0:
+            color = W10;
+            break;
+          case 40:
+            color = C40;
+            break;
+          case 80:
+            color = C80;
+            break;
+          case 127:
+            color = C127;
+            break;
+        }
+        break;
+      case 6:
+        hit = seq6[stepi] > 0 ? PURPLE : W100;
+        switch (vel6[laststep]){
+          case 0:
+            color = W10;
+            break;
+          case 40:
+            color = B40;
+            break;
+          case 80:
+            color = B80;
+            break;
+          case 127:
+            color = B127;
+            break;
+        }
+        break;
+      case 7:
+        hit = seq7[stepi] > 0 ? PURPLE : W100;
+        switch (vel7[laststep]){
+          case 0:
+            color = W10;
+            break;
+          case 40:
+            color = P40;
+            break;
+          case 80:
+            color = P80;
+            break;
+          case 127:
+            color = P127;
+            break;
+        }
+        break;
+      case 8:
+        hit = seq8[stepi] > 0 ? PURPLE : W100;
+        switch (vel8[laststep]){
+          case 0:
+            color = W10;
+            break;
+          case 40:
+            color = PK40;
+            break;
+          case 80:
+            color = PK80;
+            break;
+          case 127:
+            color = PK127;
+            break;
+        }
+        break;
+      default:
+        break;
     }
     trellis.setPixelColor(stepi,hit);
     trellis.setPixelColor(laststep, color);
     
-    on_func(36, 127, 5, seq1[stepi] == 1 ? true : false);
-    on_func(37, 127, 5, seq2[stepi] == 1 ? true : false);
-    on_func(38, 127, 5, seq3[stepi] == 1 ? true : false);
-    on_func(39, 127, 5, seq4[stepi] == 1 ? true : false);
-    on_func(40, 127, 5, seq5[stepi] == 1 ? true : false);
-    on_func(41, 127, 5, seq6[stepi] == 1 ? true : false);
-    on_func(42, 127, 5, seq7[stepi] == 1 ? true : false);
-    on_func(43, 127, 5, seq8[stepi] == 1 ? true : false);
+    on_func(track_notes[0], vel1[stepi], 5, seq1[stepi] == 1 ? true : false);
+    on_func(track_notes[1], vel2[stepi], 5, seq2[stepi] == 1 ? true : false);
+    on_func(track_notes[2], vel3[stepi], 5, seq3[stepi] == 1 ? true : false);
+    on_func(track_notes[3], vel4[stepi], 5, seq4[stepi] == 1 ? true : false);
+    on_func(track_notes[4], vel5[stepi], 5, seq5[stepi] == 1 ? true : false);
+    on_func(track_notes[5], vel6[stepi], 5, seq6[stepi] == 1 ? true : false);
+    on_func(track_notes[6], vel7[stepi], 5, seq7[stepi] == 1 ? true : false);
+    on_func(track_notes[7], vel8[stepi], 5, seq8[stepi] == 1 ? true : false);
 
     uint32_t micros_per_step = ticks_per_step * tick_micros;
     uint32_t gate_micros = 5 * micros_per_step / 16;  // s.gate is arbitary 0-15 value
@@ -211,13 +357,13 @@ public:
     if( playing ) {
       clear_pos(stepi); 
       stop(); 
-      on_func(49, 127, 5, true);
-      on_func(51, 127, 5, true);
+      on_func(ctrl_notes[1], 127, 5, true);
+      on_func(ctrl_notes[3], 127, 5, true);
     }
     else { 
       play();
-      on_func(51, 127, 5, true);
-      on_func(48, 127, 5, true);
+      on_func(ctrl_notes[3], 127, 5, true);
+      on_func(ctrl_notes[0], 127, 5, true);
     }
   }
 
@@ -229,16 +375,16 @@ public:
     if(send_clock && !extclk_micros) {
       clk_func( START );
     }
-    on_func(51, 127, 5, true);
-    on_func(48, 127, 5, true);
+    on_func(ctrl_notes[3], 127, 5, true);
+    on_func(ctrl_notes[0], 127, 5, true);
   }
 
   // signal to sequencer/MIDI core we want to stop/pause playing
   // FIXME: unclear this works correctly
   void pause() {
     playing = false;
-    on_func(49, 127, 5, true);
-    on_func(50, 127, 5, true);
+    on_func(ctrl_notes[1], 127, 5, true);
+    on_func(ctrl_notes[2], 127, 5, true);
   }
 
   // signal to sequencer/MIDI core we want to stop playing
@@ -249,14 +395,14 @@ public:
     if(send_clock && !extclk_micros) {
       clk_func( STOP );
     }
-    on_func(49, 127, 5, true);
-    on_func(51, 127, 5, true);
+    on_func(ctrl_notes[1], 127, 5, true);
+    on_func(ctrl_notes[3], 127, 5, true);
   }
 
   void reset() {
     stepi = -1;
     ticki = 0;
-    on_func(51, 127, 5, true);
+    on_func(ctrl_notes[3], 127, 5, true);
   }
 
   void clear_pos(int stepi) {

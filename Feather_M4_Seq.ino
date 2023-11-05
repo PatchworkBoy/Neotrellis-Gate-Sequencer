@@ -2,19 +2,7 @@
  * Feather M4 Seq -- An 8 track 32 step MIDI Gate Sequencer for Feather M4 Express & Neotrellis 8x8
  * 04 Nov 2023 - @apatchworkboy / Marci
  * 28 Apr 2023 - original via @todbot / Tod Kurt https://github.com/todbot/picostepseq/
- *
- * Libraries needed (all available via Library Manager):
- * - Adafruit_TinyUSB -- https://github.com/adafruit/Adafruit_TinyUSB_Arduino
- * - MIDI -- https://github.com/FortySevenEffects/arduino_midi_library
- * - Adafruit NeoTrellis -- part of Adafruit SeeSaw -- https://github.com/adafruit/Adafruit_Seesaw
- * - ArduinoJson -- https://arduinojson.org/
- *
- * To upload:
- * - Use Arduino IDE 1.8.19
- * - In "Tools", set "Tools / USB Stack: Adafruit TinyUSB"
- * - Program the sketch to the Feather M4 Express with "Upload"
- *
- **/
+ */
 
 #include <Adafruit_TinyUSB.h>
 #include <Adafruit_NeoTrellis.h>
@@ -25,20 +13,43 @@
 #define X_DIM 8 //number of columns of keys
 #define t_size Y_DIM*X_DIM
 #define t_length t_size-1
-#define maincolor seesaw_NeoPixel::Color(0,0,1)
+#define maincolor seesaw_NeoPixel::Color(0,0,5)
 #define RED seesaw_NeoPixel::Color(155,10,10)
+#define R40 seesaw_NeoPixel::Color(20,5,5)
+#define R80 seesaw_NeoPixel::Color(90,6,6)
+#define R127 seesaw_NeoPixel::Color(200,6,6)
 #define ORANGE seesaw_NeoPixel::Color(155,80,10)
+#define O40 seesaw_NeoPixel::Color(20,10,2)
+#define O80 seesaw_NeoPixel::Color(90,80,10)
+#define O127 seesaw_NeoPixel::Color(200,100,10)
 #define YELLOW seesaw_NeoPixel::Color(155,155,30)
+#define Y40 seesaw_NeoPixel::Color(20,20,4)
+#define Y80 seesaw_NeoPixel::Color(90,90,25)
+#define Y127 seesaw_NeoPixel::Color(200,200,40)
 #define GREEN seesaw_NeoPixel::Color(0,155,0)
+#define G40 seesaw_NeoPixel::Color(0,20,0)
+#define G80 seesaw_NeoPixel::Color(0,90,0)
+#define G127 seesaw_NeoPixel::Color(0,200,0)
 #define CYAN seesaw_NeoPixel::Color(40,155,155)
+#define C40 seesaw_NeoPixel::Color(4,20,20)
+#define C80 seesaw_NeoPixel::Color(25,90,90)
+#define C127 seesaw_NeoPixel::Color(40,200,200)
 #define BLUE seesaw_NeoPixel::Color(20,50,155)
+#define B40 seesaw_NeoPixel::Color(2,10,20)
+#define B80 seesaw_NeoPixel::Color(10,80,90)
+#define B127 seesaw_NeoPixel::Color(10,100,200)
 #define PURPLE seesaw_NeoPixel::Color(100,20,155)
+#define P40 seesaw_NeoPixel::Color(13,3,20)
+#define P80 seesaw_NeoPixel::Color(60,12,90)
+#define P127 seesaw_NeoPixel::Color(130,27,200)
 #define PINK seesaw_NeoPixel::Color(155,40,60)
+#define PK40 seesaw_NeoPixel::Color(20,5,9)
+#define PK80 seesaw_NeoPixel::Color(90,24,36)
+#define PK127 seesaw_NeoPixel::Color(200,53,80)
 #define OFF seesaw_NeoPixel::Color(0,0,0)
 #define W100 seesaw_NeoPixel::Color(100,100,100)
 #define W75 seesaw_NeoPixel::Color(75,75,75)
-#define W10 seesaw_NeoPixel::Color(1,1,1)
-#define PURPLE seesaw_NeoPixel::Color(100,20,155)
+#define W10 seesaw_NeoPixel::Color(4,4,4)
 
 int r, g, b = 0;
 
@@ -50,12 +61,19 @@ Adafruit_NeoTrellis t_array[Y_DIM / 4][X_DIM / 4] = {
 };
 
 Adafruit_MultiTrellis trellis((Adafruit_NeoTrellis *)t_array, Y_DIM / 4, X_DIM / 4);
-
+const int track_notes[] = {36,37,38,39,40,41,42,43}; // C2 thru G2 
+const int ctrl_notes[] = {48,49,50,51};
 int seq1[] = {
   1, 0, 0, 0, 0, 0, 0, 0,
   1, 0, 0, 0, 0, 0, 0, 0,
   1, 0, 0, 0, 0, 0, 0, 0,
   1, 0, 0, 0, 0, 0, 0, 1
+};
+int vel1[] = {
+  127,40,80,40,80,40,80,40,
+  127,40,80,40,80,40,80,40,
+  127,40,80,40,80,40,80,40,
+  127,40,80,40,80,40,80,40
 };
 int seq2[] = {
   0, 0, 0, 0, 1, 0, 0, 0,
@@ -63,11 +81,23 @@ int seq2[] = {
   0, 0, 0, 0, 1, 0, 0, 0,
   0, 0, 0, 0, 1, 0, 0, 1
 };
+int vel2[] = {
+  80,40,80,40,127,40,80,40,
+  80,40,80,40,127,40,80,40,
+  80,40,80,40,127,40,80,40,
+  80,40,80,40,127,40,80,40
+};
 int seq3[] = {
   0, 1, 1, 1, 0, 1, 1, 1, 
   0, 1, 1, 1, 0, 1, 1, 1, 
   0, 1, 1, 1, 0, 1, 1, 1, 
   0, 1, 1, 1, 0, 1, 1, 1
+};
+int vel3[] = {
+  40,80,127,40,40,80,127,40,
+  40,80,127,40,40,80,127,40,
+  40,80,127,40,40,80,127,40,
+  40,80,127,40,40,80,127,40
 };
 int seq4[] = {
   0, 0, 0, 0, 0, 0, 0, 0,
@@ -75,11 +105,23 @@ int seq4[] = {
   0, 0, 0, 0, 0, 0, 0, 0,
   0, 0, 0, 0, 0, 0, 0, 0
 };
+int vel4[] = {
+  127,40,80,40,80,40,80,40,
+  127,40,80,40,80,40,80,40,
+  127,40,80,40,80,40,80,40,
+  127,40,80,40,80,40,80,40
+};
 int seq5[] = {
   0, 0, 0, 0, 0, 0, 0, 0,
   0, 0, 0, 0, 0, 0, 0, 0,
   0, 0, 0, 0, 0, 0, 0, 0,
   0, 0, 0, 0, 0, 0, 0, 0
+};
+int vel5[] = {
+  127,40,80,40,80,40,80,40,
+  127,40,80,40,80,40,80,40,
+  127,40,80,40,80,40,80,40,
+  127,40,80,40,80,40,80,40
 };
 int seq6[] = {
   0, 0, 0, 0, 0, 0, 0, 0,
@@ -87,11 +129,23 @@ int seq6[] = {
   0, 0, 0, 0, 0, 0, 0, 0,
   0, 0, 0, 0, 0, 0, 0, 0
 };
+int vel6[] = {
+  127,40,80,40,80,40,80,40,
+  127,40,80,40,80,40,80,40,
+  127,40,80,40,80,40,80,40,
+  127,40,80,40,80,40,80,40
+};
 int seq7[] = {
   0, 0, 0, 0, 0, 0, 0, 0,
   0, 0, 0, 0, 0, 0, 0, 0,
   0, 0, 0, 0, 0, 0, 0, 0,
   0, 0, 0, 0, 0, 0, 0, 0
+};
+int vel7[] = {
+  127,40,80,40,80,40,80,40,
+  127,40,80,40,80,40,80,40,
+  127,40,80,40,80,40,80,40,
+  127,40,80,40,80,40,80,40
 };
 int seq8[] = {
   1, 1, 1, 1, 1, 1, 1, 1, 
@@ -99,9 +153,16 @@ int seq8[] = {
   1, 1, 1, 1, 1, 1, 1, 1, 
   1, 1, 1, 1, 1, 1, 1, 1
 };
+int vel8[] = {
+  127,40,80,40,80,40,80,40,
+  127,40,80,40,80,40,80,40,
+  127,40,80,40,80,40,80,40,
+  127,40,80,40,80,40,80,40
+};
 int currstep = 0;
 int laststep = 0;
 int editing = 1;
+int velocity = 0;
 
 #include "Sequencer.h"
 
@@ -150,7 +211,7 @@ uint32_t midiclk_last_micros = 0;
 // callback used by Sequencer to trigger note on
 void send_note_on(uint8_t note, uint8_t vel, uint8_t gate, bool on) {
   if (on) {
-    MIDIusb.sendNoteOn(note, cfg.midi_velocity, cfg.midi_chan);
+    MIDIusb.sendNoteOn(note, vel, cfg.midi_chan);
   }
   if (midi_out_debug) { Serial.printf("noteOn:  %d %d %d %d\n", note, vel, gate, on); }
 }
@@ -158,7 +219,7 @@ void send_note_on(uint8_t note, uint8_t vel, uint8_t gate, bool on) {
 // callback used by Sequencer to trigger note off
 void send_note_off(uint8_t note, uint8_t vel, uint8_t gate, bool on) {
   if (on) {
-    MIDIusb.sendNoteOff(note, cfg.midi_velocity, cfg.midi_chan);
+    MIDIusb.sendNoteOff(note, vel, cfg.midi_chan);
   }
   if (midi_out_debug) { Serial.printf("noteOff: %d %d %d %d\n", note, vel, gate, on); }
 }
@@ -307,6 +368,174 @@ void show_sequence(int seq) {
   } 
 }
 
+void show_accents(int seq) {
+  int col = 0;
+  switch (seq) {
+    case 1:
+      for (int i = 0; i < 32; i++) {
+        switch (vel1[i]){
+          case 0:
+            col = W10;
+            break;
+          case 40:
+            col = R40;
+            break;
+          case 80:
+            col = R80;
+            break;
+          default:
+            col = R127;
+            break;
+        }
+        trellis.setPixelColor(i,col);
+      }
+      trellis.show();
+      break;
+    case 2:
+      for (int i = 0; i < 32; i++) {
+        switch (vel2[i]){
+          case 0:
+            col = W10;
+            break;
+          case 40:
+            col = O40;
+            break;
+          case 80:
+            col = O80;
+            break;
+          default:
+            col = O127;
+            break;
+        }
+        trellis.setPixelColor(i,col);
+      }
+      trellis.show();
+      break;
+    case 3:
+      for (int i = 0; i < 32; i++) {
+        switch (vel3[i]){
+          case 0:
+            col = W10;
+            break;
+          case 40:
+            col = Y40;
+            break;
+          case 80:
+            col = Y80;
+            break;
+          default:
+            col = Y127;
+            break;
+        }
+        trellis.setPixelColor(i,col);
+      }
+      trellis.show();
+      break;
+    case 4:
+      for (int i = 0; i < 32; i++) {
+        switch (vel4[i]){
+          case 0:
+            col = W10;
+            break;
+          case 40:
+            col = G40;
+            break;
+          case 80:
+            col = G80;
+            break;
+          default:
+            col = G127;
+            break;
+        }
+        trellis.setPixelColor(i,col);
+      }
+      trellis.show();
+      break;
+    case 5:
+      for (int i = 0; i < 32; i++) {
+        switch (vel5[i]){
+          case 0:
+            col = W10;
+            break;
+          case 40:
+            col = C40;
+            break;
+          case 80:
+            col = C80;
+            break;
+          default:
+            col = C127;
+            break;
+        }
+        trellis.setPixelColor(i,col);
+      }
+      trellis.show();
+      break;
+    case 6:
+      for (int i = 0; i < 32; i++) {
+        switch (vel6[i]){
+          case 0:
+            col = W10;
+            break;
+          case 40:
+            col = B40;
+            break;
+          case 80:
+            col = B80;
+            break;
+          default:
+            col = B127;
+            break;
+        }
+        trellis.setPixelColor(i,col);
+      }
+      trellis.show();
+      break;
+    case 7:
+      for (int i = 0; i < 32; i++) {
+        switch (vel7[i]){
+          case 0:
+            col = W10;
+            break;
+          case 40:
+            col = P40;
+            break;
+          case 80:
+            col = P80;
+            break;
+          default:
+            col = P127;
+            break;
+        }
+        trellis.setPixelColor(i,col);
+      }
+      trellis.show();
+      break;
+    case 8:
+      for (int i = 0; i < 32; i++) {
+        switch (vel8[i]){
+          case 0:
+            col = W10;
+            break;
+          case 40:
+            col = PK40;
+            break;
+          case 80:
+            col = PK80;
+            break;
+          default:
+            col = PK127;
+            break;
+        }
+        trellis.setPixelColor(i,col);
+      }
+      trellis.show();
+      break;
+    default:
+      break;
+  } 
+}
+
 TrellisCallback onKey(keyEvent evt) {
   auto const now = millis();
   auto const keyId = evt.bit.NUM;
@@ -317,6 +546,8 @@ TrellisCallback onKey(keyEvent evt) {
       //trellis.setPixelColor(evt.bit.NUM, Wheel(map(evt.bit.NUM, 0, X_DIM * Y_DIM, 0, 255))); //on rising
       if (keyId < 32) {
         switch (editing){
+          case 0:
+            break;
           case 1:
             switch (seq1[keyId]){
               case 1:
@@ -413,6 +644,158 @@ TrellisCallback onKey(keyEvent evt) {
                 break;
             }
             break;
+          default:
+            break;
+        }
+        switch (velocity){
+          case 0:
+            break;
+          case 1:
+            switch (vel1[keyId]){
+              case 127:
+                trellis.setPixelColor(keyId,R40);
+                vel1[keyId] = 40;
+                break;
+              case 80:
+                trellis.setPixelColor(keyId,R127);
+                vel1[keyId] = 127;
+                break;
+              case 40:
+                trellis.setPixelColor(keyId,R80);
+                vel1[keyId] = 80;
+                break;
+              default:
+                break;
+            }
+            break;
+          case 2:
+            switch (vel2[keyId]){
+              case 127:
+                trellis.setPixelColor(keyId,O40);
+                vel2[keyId] = 40;
+                break;
+              case 80:
+                trellis.setPixelColor(keyId,O127);
+                vel2[keyId] = 127;
+                break;
+              case 40:
+                trellis.setPixelColor(keyId,O80);
+                vel2[keyId] = 80;
+                break;
+              default:
+                break;
+            }
+            break;
+          case 3:
+            switch (vel3[keyId]){
+              case 127:
+                trellis.setPixelColor(keyId,Y40);
+                vel3[keyId] = 40;
+                break;
+              case 80:
+                trellis.setPixelColor(keyId,Y127);
+                vel3[keyId] = 127;
+                break;
+              case 40:
+                trellis.setPixelColor(keyId,Y80);
+                vel3[keyId] = 80;
+                break;
+              default:
+                break;
+            }
+            break;
+          case 4:
+            switch (vel4[keyId]){
+              case 127:
+                trellis.setPixelColor(keyId,G40);
+                vel4[keyId] = 40;
+                break;
+              case 80:
+                trellis.setPixelColor(keyId,G127);
+                vel4[keyId] = 127;
+                break;
+              case 40:
+                trellis.setPixelColor(keyId,G80);
+                vel4[keyId] = 80;
+                break;
+              default:
+                break;
+            }
+            break;
+          case 5:
+            switch (vel5[keyId]){
+              case 127:
+                trellis.setPixelColor(keyId,C40);
+                vel5[keyId] = 40;
+                break;
+              case 80:
+                trellis.setPixelColor(keyId,C127);
+                vel5[keyId] = 127;
+                break;
+              case 40:
+                trellis.setPixelColor(keyId,C80);
+                vel5[keyId] = 80;
+                break;
+              default:
+                break;
+            }
+            break;
+          case 6:
+            switch (vel6[keyId]){
+              case 127:
+                trellis.setPixelColor(keyId,B40);
+                vel6[keyId] = 40;
+                break;
+              case 80:
+                trellis.setPixelColor(keyId,B127);
+                vel6[keyId] = 127;
+                break;
+              case 40:
+                trellis.setPixelColor(keyId,B80);
+                vel6[keyId] = 80;
+                break;
+              default:
+                break;
+            }
+            break;
+          case 7:
+            switch (vel7[keyId]){
+              case 127:
+                trellis.setPixelColor(keyId,P40);
+                vel7[keyId] = 40;
+                break;
+              case 80:
+                trellis.setPixelColor(keyId,P127);
+                vel7[keyId] = 127;
+                break;
+              case 40:
+                trellis.setPixelColor(keyId,P80);
+                vel7[keyId] = 80;
+                break;
+              default:
+                break;
+            }
+            break;
+          case 8:
+            switch (vel8[keyId]){
+              case 127:
+                trellis.setPixelColor(keyId,PK40);
+                vel8[keyId] = 40;
+                break;
+              case 80:
+                trellis.setPixelColor(keyId,PK127);
+                vel8[keyId] = 127;
+                break;
+              case 40:
+                trellis.setPixelColor(keyId,PK80);
+                vel8[keyId] = 80;
+                break;
+              default:
+                break;
+            }
+            break;
+          default:
+            break;
         }
       } else {
         switch (keyId){
@@ -438,35 +821,85 @@ TrellisCallback onKey(keyEvent evt) {
             break;
           case 32:
             editing = 1;
+            velocity = 0;
             show_sequence(editing);
             break;
           case 33:
             editing = 2;
+            velocity = 0;
             show_sequence(editing);
             break;
           case 34:
             editing = 3;
+            velocity = 0;
             show_sequence(editing);
             break;
           case 35:
             editing = 4;
+            velocity = 0;
             show_sequence(editing);
             break;
           case 36:
             editing = 5;
+            velocity = 0;
             show_sequence(editing);
             break;
           case 37:
             editing = 6;
+            velocity = 0;
             show_sequence(editing);
             break;
           case 38:
             editing = 7;
+            velocity = 0;
             show_sequence(editing);
             break;
           case 39:
             editing = 8;
+            velocity = 0;
             show_sequence(editing);
+            break;
+          case 40:
+            editing = 0;
+            velocity = 1;
+            show_accents(velocity);
+            break;
+          case 41:
+            editing = 0;
+            velocity = 2;
+            show_accents(velocity);
+            break;
+          case 42:
+            editing = 0;
+            velocity = 3;
+            show_accents(velocity);
+            break;
+          case 43:
+            editing = 0;
+            velocity = 4;
+            show_accents(velocity);
+            break;
+          case 44:
+            editing = 0;
+            velocity = 5;
+            show_accents(velocity);
+            break;
+          case 45:
+            editing = 0;
+            velocity = 6;
+            show_accents(velocity);
+            break;
+          case 46:
+            editing = 0;
+            velocity = 7;
+            show_accents(velocity);
+            break;
+          case 47:
+            editing = 0;
+            velocity = 8;
+            show_accents(velocity);
+            break;
+          default:
             break;
         }
       }
@@ -503,6 +936,15 @@ void init_interface(){
   trellis.setPixelColor(37,BLUE);
   trellis.setPixelColor(38,PURPLE);
   trellis.setPixelColor(39,PINK);
+  //Vel 1 > 8
+  trellis.setPixelColor(40,R80);
+  trellis.setPixelColor(41,O80);
+  trellis.setPixelColor(42,Y80);
+  trellis.setPixelColor(43,G80);
+  trellis.setPixelColor(44,C80);
+  trellis.setPixelColor(45,B80);
+  trellis.setPixelColor(46,P80);
+  trellis.setPixelColor(47,PK80);
   //Control Row
   trellis.setPixelColor(56,GREEN);
   trellis.setPixelColor(57,RED);

@@ -7,8 +7,10 @@ Designed for use with the Adafruit 8x8 Neotrellis Feather M4 Kit, no additional 
 - UK: https://thepihut.com/products/adafruit-untztrument-open-source-8x8-grid-controller-kit-8x8-white-leds
 
 NeoTrellis Surface...
-- Row 1 - 4: Steps 1 thru 32
-- Row 5: Trk1 | Trk2 | Trk3 | Trk4 | Trk5 | Trk6 | Trk7 | Trk8
+- Row 1 - 4: Steps 1 thru 32 (pattern edit: on/off, velocity edit: cycle thru velocity 40 / 80 / 127)
+- Row 5: Pattern Edit - Trk1 | Trk2 | Trk3 | Trk4 | Trk5 | Trk6 | Trk7 | Trk8
+- Row 6: Velocity Map Edit - Trk1 | Trk2 | Trk3 | Trk4 | Trk5 | Trk6 | Trk7 | Trk8
+- Row 7:
 - Bottom row: Toggle Play/Stop | Stop | Pause (iffy, don't bother) | Reset | - | - | Tempo down | Tempo up
 
 Outputs self-generated MIDI Clock (24 PPQN), Play/Stop/Cont (ideal for use in VCV rack with MIDI > CV module)
