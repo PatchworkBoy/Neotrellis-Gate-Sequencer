@@ -49,6 +49,7 @@ public:
   int ticki; // which midi clock we're on
   int stepi; // which sequencer step we're on
   int seqno;
+  int length;
   int transpose;
   bool playing;
   bool send_clock;
@@ -66,6 +67,7 @@ public:
     ticki = 0;
     ticks_per_step = 6; // 6 = 1/16th, 12 = 1/8, 24 = 1/4,
     seqno = aseqno;
+    length = 32;
     playing = false;
     extclk_micros = 0;
     send_clock = false;
@@ -150,9 +152,9 @@ public:
     if( !playing ) { trellis.show(); return; }
     trellis.show();
     (void)delta_t; // silence unused variable
-    stepi = (stepi + 1) % numsteps; // go to next step
+    stepi = (stepi + 1) % length; // go to next step
     currstep = stepi;
-    laststep = stepi - 1 < 0 ? numsteps - 1 : stepi - 1;
+    laststep = stepi - 1 < 0 ? length - 1 : stepi - 1;
 
     int color = 0;
     int hit = 0;
@@ -338,6 +340,7 @@ public:
     }
     trellis.setPixelColor(stepi,hit);
     trellis.setPixelColor(laststep, color);
+    if (length < numsteps) trellis.setPixelColor(length-1,C127);
     
     on_func(track_notes[0], vel1[stepi], 5, seq1[stepi] == 1 ? true : false);
     on_func(track_notes[1], vel2[stepi], 5, seq2[stepi] == 1 ? true : false);

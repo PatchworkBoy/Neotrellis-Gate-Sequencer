@@ -193,6 +193,7 @@ int currstep = 0;
 int laststep = 0;
 int editing = 1;
 int velocity = 0;
+int lenedit = 0;
 
 #include "Sequencer.h"
 
@@ -218,6 +219,7 @@ const bool midi_in_debug = false;
 const bool marci_debug = false;
 
 const int numseqs = 8;
+int length = 32;
 
 // end hardware definitions
 
@@ -328,6 +330,7 @@ void configure_sequencer() {
   seqr.off_func = send_note_off;
   seqr.clk_func = send_clock_start_stop;
   seqr.send_clock = cfg.midi_send_clock;
+  seqr.length = length;
 };
 
 // Input a value 0 to 255 to get a color value.
@@ -573,7 +576,11 @@ TrellisCallback onKey(keyEvent evt) {
   switch (evt.bit.EDGE)
   {
     case SEESAW_KEYPAD_EDGE_RISING:
-      if (keyId < 32) {
+      if (lenedit == 1 && keyId < 32) {
+        length = keyId+1;
+        trellis.setPixelColor(keyId,C127);
+        configure_sequencer();
+      } else if (keyId < 32) {
         switch (editing){
           case 0:
             break;
@@ -911,6 +918,13 @@ TrellisCallback onKey(keyEvent evt) {
           case 53:
             break;
           case 54:
+            if (lenedit == 0) {
+              lenedit = 1;
+              trellis.setPixelColor(54,G127);
+            } else {
+              lenedit = 0;
+              trellis.setPixelColor(54,G40);
+            }
             break;
           case 55:
             switch(cfg.step_size){
@@ -976,21 +990,6 @@ TrellisCallback onKey(keyEvent evt) {
   return nullptr;
 }
 
-void theaterChase(uint32_t c, uint8_t wait) {
-  for (int j = 0; j < 10; j++) { //do 10 cycles of chasing
-    for (int q = 0; q < 3; q++) {
-      for (uint16_t i = 0; i < t_size; i = i + 3) {
-        trellis.setPixelColor(i + q, c); //turn every third pixel on
-      }
-      trellis.show();
-      delay(wait);
-      for (uint16_t i = 0; i < t_size; i = i + 3) {
-        trellis.setPixelColor(i + q, maincolor); //turn every third pixel off
-      }
-    }
-  }
-}
-
 void init_flash(){
   // Initialize flash library and check its chip ID.
   if (!flash.begin()) {
@@ -1036,6 +1035,7 @@ void init_interface(){
   trellis.setPixelColor(46,P80);
   trellis.setPixelColor(47,PK80);
   //
+  trellis.setPixelColor(54,G40);
   switch(cfg.step_size){
     case SIXTEENTH_NOTE:
       trellis.setPixelColor(55,O127);
