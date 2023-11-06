@@ -194,6 +194,8 @@ int laststep = 0;
 int editing = 1;
 int velocity = 0;
 int lenedit = 0;
+int transpose = 0;
+int run = 0;
 
 #include "Sequencer.h"
 
@@ -331,6 +333,7 @@ void configure_sequencer() {
   seqr.clk_func = send_clock_start_stop;
   seqr.send_clock = cfg.midi_send_clock;
   seqr.length = length;
+  seqr.transpose = transpose;
 };
 
 // Input a value 0 to 255 to get a color value.
@@ -916,6 +919,25 @@ TrellisCallback onKey(keyEvent evt) {
             show_accents(velocity);
             break;
           case 53:
+            if (run == 0) {
+              switch (transpose) {
+                case 0:
+                  transpose = 12;
+                  trellis.setPixelColor(53,B80);
+                  break;
+                case 12:
+                  transpose = 24;
+                  trellis.setPixelColor(53,B127);
+                  break;
+                case 24:
+                  transpose = 0;
+                  trellis.setPixelColor(53,B40);
+                  break;
+                default:
+                  break;
+              }
+              configure_sequencer();
+            }
             break;
           case 54:
             if (lenedit == 0) {
@@ -1035,6 +1057,19 @@ void init_interface(){
   trellis.setPixelColor(46,P80);
   trellis.setPixelColor(47,PK80);
   //
+  switch (transpose) {
+    case 0:
+      trellis.setPixelColor(53,B40);
+      break;
+    case 12:
+      trellis.setPixelColor(53,B80);
+      break;
+    case 24:
+      trellis.setPixelColor(53,B127);
+      break;
+    default:
+      break;
+  }
   trellis.setPixelColor(54,G40);
   switch(cfg.step_size){
     case SIXTEENTH_NOTE:

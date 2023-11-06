@@ -10,12 +10,12 @@ Designed for use with the Adafruit 8x8 Neotrellis Feather M4 Kit, no additional 
 
 NeoTrellis Surface...
 
-![Neotrellis Keys](https://apatchworkboy.com/wp-content/uploads/2023/11/Screenshot-2023-11-06-at-19.50.04.png)
+![Neotrellis Keys](https://apatchworkboy.com/wp-content/uploads/2023/11/Screenshot-2023-11-06-at-20.50.01-1024x966.png)
 
 - Row 1 - 4: Steps 1 thru 32 (pattern edit: on/off, velocity edit: cycle thru velocity 40 / 80 / 127, Length: select end step)
 - Row 5: Pattern Edit - Trk1 | Trk2 | Trk3 | Trk4 | Trk5 | Trk6 | Trk7 | Trk8
 - Row 6: Velocity Map Edit - Trk1 | Trk2 | Trk3 | Trk4 | Trk5 | Trk6 | Trk7 | Trk8
-- Row 7: - | - | - | - | - | - | Global Pattern Length | toggle step size - quarter / eighth / sixteenth
+- Row 7: - | - | - | - | - | Octave 0/+1/+2 (only while stopped) | Global Pattern Length | toggle step size - quarter / eighth / sixteenth
 - Bottom row: Toggle Play/Stop | Stop | Reset | SAVE | FACTORY RESET | MIDICLOCK Send On/Off | Tempo down | Tempo up
 
 - SAVE: store all patterns, velocity maps, current step-size and tempo to flash.
@@ -37,5 +37,7 @@ Mapping for VCVRack MIDI > Gate module:
 - Play: Note C3 (48)
 - Stop: Note C#3 (49)
 - Reset: Note D#3 (51)
+
+Octave button shifts ALL notes up +1ve or +2ve
 
 FAR from perfect. Open to improvements - throw me a pull request.

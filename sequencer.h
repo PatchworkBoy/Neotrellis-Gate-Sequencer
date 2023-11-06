@@ -103,18 +103,18 @@ public:
     // if we have a held note and it's time to turn it off, turn it off
     if( held_gate_millis != 0 && millis() >= held_gate_millis ) {
       held_gate_millis = 0;
-      off_func( track_notes[0], 0, 1, true);
-      off_func( track_notes[1], 0, 1, true);
-      off_func( track_notes[2], 0, 1, true);
-      off_func( track_notes[3], 0, 1, true);
-      off_func( track_notes[4], 0, 1, true);
-      off_func( track_notes[5], 0, 1, true);
-      off_func( track_notes[6], 0, 1, true);
-      off_func( track_notes[7], 0, 1, true);
-      off_func( ctrl_notes[0], 0, 1, true);
-      off_func( ctrl_notes[1], 0, 1, true);
-      off_func( ctrl_notes[2], 0, 1, true);
-      off_func( ctrl_notes[3], 0, 1, true);
+      off_func( track_notes[0]+transpose, 0, 1, true);
+      off_func( track_notes[1]+transpose, 0, 1, true);
+      off_func( track_notes[2]+transpose, 0, 1, true);
+      off_func( track_notes[3]+transpose, 0, 1, true);
+      off_func( track_notes[4]+transpose, 0, 1, true);
+      off_func( track_notes[5]+transpose, 0, 1, true);
+      off_func( track_notes[6]+transpose, 0, 1, true);
+      off_func( track_notes[7]+transpose, 0, 1, true);
+      off_func( ctrl_notes[0]+transpose, 0, 1, true);
+      off_func( ctrl_notes[1]+transpose, 0, 1, true);
+      off_func( ctrl_notes[2]+transpose, 0, 1, true);
+      off_func( ctrl_notes[3]+transpose, 0, 1, true);
     }
 
     if( send_clock && playing && !extclk_micros ) {
@@ -342,14 +342,14 @@ public:
     trellis.setPixelColor(laststep, color);
     if (length < numsteps) trellis.setPixelColor(length-1,C127);
     
-    on_func(track_notes[0], vel1[stepi], 5, seq1[stepi] == 1 ? true : false);
-    on_func(track_notes[1], vel2[stepi], 5, seq2[stepi] == 1 ? true : false);
-    on_func(track_notes[2], vel3[stepi], 5, seq3[stepi] == 1 ? true : false);
-    on_func(track_notes[3], vel4[stepi], 5, seq4[stepi] == 1 ? true : false);
-    on_func(track_notes[4], vel5[stepi], 5, seq5[stepi] == 1 ? true : false);
-    on_func(track_notes[5], vel6[stepi], 5, seq6[stepi] == 1 ? true : false);
-    on_func(track_notes[6], vel7[stepi], 5, seq7[stepi] == 1 ? true : false);
-    on_func(track_notes[7], vel8[stepi], 5, seq8[stepi] == 1 ? true : false);
+    on_func(track_notes[0]+transpose, vel1[stepi], 5, seq1[stepi] == 1 ? true : false);
+    on_func(track_notes[1]+transpose, vel2[stepi], 5, seq2[stepi] == 1 ? true : false);
+    on_func(track_notes[2]+transpose, vel3[stepi], 5, seq3[stepi] == 1 ? true : false);
+    on_func(track_notes[3]+transpose, vel4[stepi], 5, seq4[stepi] == 1 ? true : false);
+    on_func(track_notes[4]+transpose, vel5[stepi], 5, seq5[stepi] == 1 ? true : false);
+    on_func(track_notes[5]+transpose, vel6[stepi], 5, seq6[stepi] == 1 ? true : false);
+    on_func(track_notes[6]+transpose, vel7[stepi], 5, seq7[stepi] == 1 ? true : false);
+    on_func(track_notes[7]+transpose, vel8[stepi], 5, seq8[stepi] == 1 ? true : false);
 
     uint32_t micros_per_step = ticks_per_step * tick_micros;
     uint32_t gate_micros = 5 * micros_per_step / 16;  // s.gate is arbitary 0-15 value
@@ -360,13 +360,13 @@ public:
     if( playing ) {
       clear_pos(stepi); 
       stop(); 
-      on_func(ctrl_notes[1], 127, 5, true);
-      on_func(ctrl_notes[3], 127, 5, true);
+      on_func(ctrl_notes[1]+transpose, 127, 5, true);
+      on_func(ctrl_notes[3]+transpose, 127, 5, true);
     }
     else { 
       play();
-      on_func(ctrl_notes[3], 127, 5, true);
-      on_func(ctrl_notes[0], 127, 5, true);
+      on_func(ctrl_notes[3]+transpose, 127, 5, true);
+      on_func(ctrl_notes[0]+transpose, 127, 5, true);
     }
   }
 
@@ -375,37 +375,48 @@ public:
     stepi = -1; // hmm, but goes to 0 on first downbeat
     ticki = 0;
     playing = true;
+    run = 1;
     if(send_clock && !extclk_micros) {
       clk_func( START );
     }
-    on_func(ctrl_notes[3], 127, 5, true);
-    on_func(ctrl_notes[0], 127, 5, true);
+    on_func(ctrl_notes[3]+transpose, 127, 5, true);
+    on_func(ctrl_notes[0]+transpose, 127, 5, true);
   }
 
   // signal to sequencer/MIDI core we want to stop/pause playing
   // FIXME: unclear this works correctly
   void pause() {
     playing = false;
-    on_func(ctrl_notes[1], 127, 5, true);
-    on_func(ctrl_notes[2], 127, 5, true);
+    on_func(ctrl_notes[1]+transpose, 127, 5, true);
+    on_func(ctrl_notes[2]+transpose, 127, 5, true);
   }
 
   // signal to sequencer/MIDI core we want to stop playing
   void stop() {
     playing = false;
+    run = 0;
     clear_pos(stepi);
     stepi = -1;
     if(send_clock && !extclk_micros) {
       clk_func( STOP );
     }
-    on_func(ctrl_notes[1], 127, 5, true);
-    on_func(ctrl_notes[3], 127, 5, true);
+    off_func( track_notes[0]+transpose, 0, 1, true);
+    off_func( track_notes[1]+transpose, 0, 1, true);
+    off_func( track_notes[2]+transpose, 0, 1, true);
+    off_func( track_notes[3]+transpose, 0, 1, true);
+    off_func( track_notes[4]+transpose, 0, 1, true);
+    off_func( track_notes[5]+transpose, 0, 1, true);
+    off_func( track_notes[6]+transpose, 0, 1, true);
+    off_func( track_notes[7]+transpose, 0, 1, true);
+
+    on_func(ctrl_notes[1]+transpose, 127, 5, true);
+    on_func(ctrl_notes[3]+transpose, 127, 5, true);
   }
 
   void reset() {
     stepi = -1;
     ticki = 0;
-    on_func(ctrl_notes[3], 127, 5, true);
+    on_func(ctrl_notes[3]+transpose, 127, 5, true);
   }
 
   void clear_pos(int stepi) {
