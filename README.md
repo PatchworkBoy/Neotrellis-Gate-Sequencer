@@ -1,5 +1,6 @@
 # Neotrellis-Trigger-Sequencer
 [![YouTube Demo Video](http://img.youtube.com/vi/L5sNkB95-T4/0.jpg)](http://www.youtube.com/watch?v=L5sNkB95-T4 "Demo Video")
+
 An 8 track 32 step MIDI (over USB) gate/trigger sequencer and MIDI Clock Generator for Feather M4 Express / Neotrellis 8x8
 Adapted from https://github.com/todbot/picostepseq/
 
