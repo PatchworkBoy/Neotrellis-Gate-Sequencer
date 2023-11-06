@@ -2,13 +2,37 @@
  * Feather M4 Seq -- An 8 track 32 step MIDI Gate Sequencer for Feather M4 Express & Neotrellis 8x8
  * 04 Nov 2023 - @apatchworkboy / Marci
  * 28 Apr 2023 - original via @todbot / Tod Kurt https://github.com/todbot/picostepseq/
- */
-
+ *
+ * Libraries needed (all available via Library Manager):
+ * - Adafruit SPIFlash -- https://github.com/adafruit/Adafruit_SPIFlash
+ * - Adafruit_TinyUSB -- https://github.com/adafruit/Adafruit_TinyUSB_Arduino
+ * - Adafruit Seesaw -- https://github.com/adafruit/Adafruit_Seesaw
+ * - MIDI -- https://github.com/FortySevenEffects/arduino_midi_library
+ * - ArduinoJson -- https://arduinojson.org/
+ *
+ * To upload:
+ * - Use Arduino IDE 1.8.19+
+ * - In "Tools", set "Tools / USB Stack: Adafruit TinyUSB"
+ * - Program the sketch to the Feather M4 Express with "Upload"
+ *
+ **/
+ 
+#include <SPI.h>
+#include <SdFat.h>
+#include <Adafruit_SPIFlash.h>
 #include <Adafruit_TinyUSB.h>
 #include <Adafruit_NeoTrellis.h>
 #include <MIDI.h>
 #include <ArduinoJson.h>
 
+// for flashTransport definition
+#include "flash_config.h"
+Adafruit_SPIFlash flash(&flashTransport);
+
+// file system object from SdFat
+FatVolume fatfs;
+
+#define D_FLASH "/M4SEQ32"
 #define Y_DIM 8 //number of rows of key
 #define X_DIM 8 //number of columns of keys
 #define t_size Y_DIM*X_DIM
@@ -61,8 +85,14 @@ Adafruit_NeoTrellis t_array[Y_DIM / 4][X_DIM / 4] = {
 };
 
 Adafruit_MultiTrellis trellis((Adafruit_NeoTrellis *)t_array, Y_DIM / 4, X_DIM / 4);
+
+const char* save_file = "/M4SEQ32/saved_sequences.json";
+const char* save_file2 = "/M4SEQ32/saved_velocities.json";
+const char* save_file3 = "/M4SEQ32/saved_settings.json";
 const int track_notes[] = {36,37,38,39,40,41,42,43}; // C2 thru G2 
 const int ctrl_notes[] = {48,49,50,51};
+
+// factory reset patterns and maps...
 int seq1[] = {
   1, 0, 0, 0, 0, 0, 0, 0,
   1, 0, 0, 0, 0, 0, 0, 0,
@@ -543,7 +573,6 @@ TrellisCallback onKey(keyEvent evt) {
   switch (evt.bit.EDGE)
   {
     case SEESAW_KEYPAD_EDGE_RISING:
-      //trellis.setPixelColor(evt.bit.NUM, Wheel(map(evt.bit.NUM, 0, X_DIM * Y_DIM, 0, 255))); //on rising
       if (keyId < 32) {
         switch (editing){
           case 0:
@@ -799,26 +828,6 @@ TrellisCallback onKey(keyEvent evt) {
         }
       } else {
         switch (keyId){
-          case 62:
-            tempo = tempo - 1;
-            configure_sequencer();
-            break;
-          case 63:
-            tempo = tempo + 1;
-            configure_sequencer();
-            break;
-          case 56:
-            seqr.toggle_play_stop();
-            break;
-          case 57:
-            seqr.stop();
-            break;
-          case 58:
-            seqr.pause();
-            break;
-          case 59:
-            seqr.reset();
-            break;
           case 32:
             editing = 1;
             velocity = 0;
@@ -899,6 +908,62 @@ TrellisCallback onKey(keyEvent evt) {
             velocity = 8;
             show_accents(velocity);
             break;
+          case 53:
+            break;
+          case 54:
+            break;
+          case 55:
+            switch(cfg.step_size){
+              case SIXTEENTH_NOTE:
+                trellis.setPixelColor(55,O40);
+                cfg.step_size = QUARTER_NOTE;
+                break;
+              case QUARTER_NOTE:
+                trellis.setPixelColor(55,O80);
+                cfg.step_size = EIGHTH_NOTE;
+                break;
+              case EIGHTH_NOTE:
+                trellis.setPixelColor(55,O127);
+                cfg.step_size = SIXTEENTH_NOTE;
+                break;
+              default:
+                break;
+            }
+            configure_sequencer();
+            break;
+          case 56:
+            seqr.toggle_play_stop();
+            break;
+          case 57:
+            seqr.stop();
+            break;
+          case 58:
+            seqr.reset();
+            break;
+          case 59:
+            sequences_write();
+            break;
+          case 60:
+            pattern_reset();
+            break;
+          case 61:
+            if (cfg.midi_send_clock == true){
+              cfg.midi_send_clock = false;
+              trellis.setPixelColor(61, Y40);
+            } else {
+              cfg.midi_send_clock = true;
+              trellis.setPixelColor(61, Y127);
+            }
+            configure_sequencer();
+            break;
+          case 62:
+            tempo = tempo - 1;
+            configure_sequencer();
+            break;
+          case 63:
+            tempo = tempo + 1;
+            configure_sequencer();
+            break;
           default:
             break;
         }
@@ -926,6 +991,31 @@ void theaterChase(uint32_t c, uint8_t wait) {
   }
 }
 
+void init_flash(){
+  // Initialize flash library and check its chip ID.
+  if (!flash.begin()) {
+    Serial.println(F("Error, failed to initialize flash chip!"));
+    while (1) {
+      yield();
+    }
+  }
+  Serial.print(F("Flash chip JEDEC ID: 0x"));
+  Serial.println(flash.getJEDECID(), HEX);
+
+  // First call begin to mount the filesystem.  Check that it returns true
+  // to make sure the filesystem was mounted.
+  if (!fatfs.begin(&flash)) {
+    Serial.println(F("Error, failed to mount newly formatted filesystem!"));
+    Serial.println(
+        F("Was the flash chip formatted with the SdFat_format example?"));
+    while (1) {
+      yield();
+    }
+  }
+  Serial.println(F("Mounted filesystem!"));
+  flash_store();
+}
+
 void init_interface(){
   //Seq 1 > 8
   trellis.setPixelColor(32,RED);
@@ -945,11 +1035,28 @@ void init_interface(){
   trellis.setPixelColor(45,B80);
   trellis.setPixelColor(46,P80);
   trellis.setPixelColor(47,PK80);
+  //
+  switch(cfg.step_size){
+    case SIXTEENTH_NOTE:
+      trellis.setPixelColor(55,O127);
+      break;
+    case QUARTER_NOTE:
+      trellis.setPixelColor(55,O40);
+      break;
+    case EIGHTH_NOTE:
+      trellis.setPixelColor(55,O80);
+      break;
+    default:
+      break;
+  }
+  trellis.setPixelColor(55,O127);  
   //Control Row
   trellis.setPixelColor(56,GREEN);
   trellis.setPixelColor(57,RED);
   trellis.setPixelColor(58,ORANGE);
-  trellis.setPixelColor(59,YELLOW);
+  trellis.setPixelColor(59,BLUE);
+  trellis.setPixelColor(60,CYAN);
+  trellis.setPixelColor(61,YELLOW);
   trellis.setPixelColor(62,RED);
   trellis.setPixelColor(63,GREEN);
 
@@ -978,24 +1085,22 @@ void setup() {
 
   Serial.begin(115200);
 
+  init_flash();
+  
   sequences_read();
+  velocities_read();
+  settings_read();
   sequence_load(2);
   configure_sequencer();
   delay(100);
   if (!trellis.begin()) {
-    Serial.println("failed to begin trellis");
+    Serial.println(F("failed to begin trellis"));
     while (1) delay(1);
   } else {
-    Serial.println("Init..."); 
+    Serial.println(F("Init..."));
   }
-  
-  randomSeed(analogRead(0));
-  r = random(0, 256);
-  g = random(0, 256);
-  b = random(0, 256);
-  theaterChase(seesaw_NeoPixel::Color(r, g, b), 50);
   init_interface();
-  Serial.println("GO!"); 
+  Serial.println(F("GO!"));
   show_sequence(1);
 }
 

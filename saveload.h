@@ -3,55 +3,496 @@
 //
 
 uint32_t last_sequence_write_millis = 0;
+// Pattern Factory Presets
+const char* BANK1 = "[[1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,1],[0,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,1,0,0,1],[0,1,1,1,0,1,1,1,0,1,1,1,0,1,1,1,0,1,1,1,0,1,1,1,0,1,1,1,0,1,1,1],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]]";
+// Velocity Map Factory Presets
+const char* BANK2 = "[[127,40,80,40,80,40,80,40,127,40,80,40,80,40,80,40,127,40,80,40,80,40,80,40,127,40,80,40,80,40,80,40],[80,40,80,40,127,40,80,40,80,40,80,40,127,40,80,40,80,40,80,40,127,40,80,40,80,40,80,40,127,40,80,40],[40,80,127,40,40,80,127,40,40,80,127,40,40,80,127,40,40,80,127,40,40,80,127,40,40,80,127,40,40,80,127,40],[127,40,80,40,80,40,80,40,127,40,80,40,80,40,80,40,127,40,80,40,80,40,80,40,127,40,80,40,80,40,80,40],[127,40,80,40,80,40,80,40,127,40,80,40,80,40,80,40,127,40,80,40,80,40,80,40,127,40,80,40,80,40,80,40],[127,40,80,40,80,40,80,40,127,40,80,40,80,40,80,40,127,40,80,40,80,40,80,40,127,40,80,40,80,40,80,40],[127,40,80,40,80,40,80,40,127,40,80,40,80,40,80,40,127,40,80,40,80,40,80,40,127,40,80,40,80,40,80,40],[127,40,80,40,80,40,80,40,127,40,80,40,80,40,80,40,127,40,80,40,80,40,80,40,127,40,80,40,80,40,80,40]]";
+// Tempo & StepSize Factory Presets
+const char* BANK3 = "[[120,6]]";
 
+// write all settings to "disk"
+void settings_write() {
+  Serial.println(F("settings_write"));
+  last_sequence_write_millis = millis();
+
+  DynamicJsonDocument doc(8192);  // assistant said 6144
+  JsonArray set_array = doc.createNestedArray();
+  set_array.add(tempo);
+  set_array.add(cfg.step_size);
+
+  fatfs.remove(save_file3);
+  File32 file = fatfs.open(save_file3, FILE_WRITE);
+  if (!file) {
+    Serial.println(F("settings_write: Failed to create file"));
+    return;
+  }
+  if (serializeJson(doc, file) == 0) {
+    Serial.println(F("settings_write: Failed to write to file"));
+  }
+  file.close();
+  Serial.print(F("saved_settings_json = \""));
+  serializeJson(doc, Serial);
+  Serial.println(F("\"\nsettings saved"));
+}
+// write all velocities to "disk"
+void velocities_write() {
+  Serial.println(F("velocities_write"));
+  last_sequence_write_millis = millis();
+
+  DynamicJsonDocument doc(8192);  // assistant said 6144
+  for (int j = 0; j < numseqs; j++) {
+    JsonArray vel_array = doc.createNestedArray();
+    switch (j){
+      case 0:
+        for (int i = 0; i < numsteps; i++) {
+          int s = vel1[i];
+          vel_array.add(s);
+        }
+        break;
+      case 1:
+        for (int i = 0; i < numsteps; i++) {
+          int s = vel2[i];
+          vel_array.add(s);
+        }
+        break;
+      case 2:
+        for (int i = 0; i < numsteps; i++) {
+          int s = vel3[i];
+          vel_array.add(s);
+        }
+        break;
+      case 3:
+        for (int i = 0; i < numsteps; i++) {
+          int s = vel4[i];
+          vel_array.add(s);
+        }
+        break;
+      case 4:
+        for (int i = 0; i < numsteps; i++) {
+          int s = vel5[i];
+          vel_array.add(s);
+        }
+        break;
+      case 5:
+        for (int i = 0; i < numsteps; i++) {
+          int s = vel6[i];
+          vel_array.add(s);
+        }
+        break;
+      case 6:
+        for (int i = 0; i < numsteps; i++) {
+          int s = vel7[i];
+          vel_array.add(s);
+        }
+        break;
+      case 7:
+        for (int i = 0; i < numsteps; i++) {
+          int s = vel8[i];
+          vel_array.add(s);
+        }
+        break;
+      default:
+        break;
+    }
+  }
+
+  fatfs.remove(save_file2);
+  File32 file = fatfs.open(save_file2, FILE_WRITE);
+  if (!file) {
+    Serial.println(F("velocities_write: Failed to create file"));
+    return;
+  }
+  if (serializeJson(doc, file) == 0) {
+    Serial.println(F("velocities_write: Failed to write to file"));
+  }
+  file.close();
+  Serial.print(F("saved_velocities_json = \""));
+  serializeJson(doc, Serial);
+  Serial.println(F("\"\nvelocities saved"));
+  settings_write();
+}
 // write all sequences to "disk"
 void sequences_write() {
-  Serial.println("sequences_write");
+  Serial.println(F("sequences_write"));
   // save wear & tear on flash, only allow writes every 10 seconds
   if (millis() - last_sequence_write_millis < 10 * 1000) {  // only allow writes every 10 secs
-    Serial.println("sequences_write: too soon, wait a bit more");
+    Serial.println(F("sequences_write: too soon, wait a bit more"));
   }
   last_sequence_write_millis = millis();
 
   DynamicJsonDocument doc(8192);  // assistant said 6144
   for (int j = 0; j < numseqs; j++) {
     JsonArray seq_array = doc.createNestedArray();
-    for (int i = 0; i < numsteps; i++) {
-      Step s = sequences[j][i];
-      JsonArray step_array = seq_array.createNestedArray();
-      step_array.add(s.note);
-      step_array.add(s.vel);
-      step_array.add(s.gate);
-      step_array.add(s.on);
+    switch (j){
+      case 0:
+        for (int i = 0; i < numsteps; i++) {
+          int s = seq1[i];
+          seq_array.add(s);
+        }
+        break;
+      case 1:
+        for (int i = 0; i < numsteps; i++) {
+          int s = seq2[i];
+          seq_array.add(s);
+        }
+        break;
+      case 2:
+        for (int i = 0; i < numsteps; i++) {
+          int s = seq3[i];
+          seq_array.add(s);
+        }
+        break;
+      case 3:
+        for (int i = 0; i < numsteps; i++) {
+          int s = seq4[i];
+          seq_array.add(s);
+        }
+        break;
+      case 4:
+        for (int i = 0; i < numsteps; i++) {
+          int s = seq5[i];
+          seq_array.add(s);
+        }
+        break;
+      case 5:
+        for (int i = 0; i < numsteps; i++) {
+          int s = seq6[i];
+          seq_array.add(s);
+        }
+        break;
+      case 6:
+        for (int i = 0; i < numsteps; i++) {
+          int s = seq7[i];
+          seq_array.add(s);
+        }
+        break;
+      case 7:
+        for (int i = 0; i < numsteps; i++) {
+          int s = seq8[i];
+          seq_array.add(s);
+        }
+        break;
+      default:
+        break;
     }
   }
+
+  fatfs.remove(save_file);
+  File32 file = fatfs.open(save_file, FILE_WRITE);
+  if (!file) {
+    Serial.println(F("sequences_write: Failed to create file"));
+    return;
+  }
+  if (serializeJson(doc, file) == 0) {
+    Serial.println(F("sequences_write: Failed to write to file"));
+  }
+  file.close();
+  Serial.print(F("saved_sequences_json = \""));
+  serializeJson(doc, Serial);
+  Serial.println(F("\"\nsequences saved"));
+  velocities_write();
+}
+
+void pattern_reset() {
+  Serial.println(F("BANK1_reset"));
+  DynamicJsonDocument doc(8192);  // assistant said 6144
+  DeserializationError error = deserializeJson(doc, BANK1);
+  if (error) {
+    Serial.print(F("BANK1_reset: deserialize failed: "));
+    Serial.println(error.c_str());
+    return;
+  }
+  for (int j = 0; j < numseqs; j++) {
+    JsonArray seq_array = doc[j];
+    switch (j){
+      case 0:
+        for (int i = 0; i < numsteps; i++) {
+          seq1[i] = seq_array[i];
+        }
+        break;
+      case 1:
+        for (int i = 0; i < numsteps; i++) {
+          seq2[i] = seq_array[i];
+        }
+        break;
+      case 2:
+        for (int i = 0; i < numsteps; i++) {
+          seq3[i] = seq_array[i];
+        }
+        break;
+      case 3:
+        for (int i = 0; i < numsteps; i++) {
+          seq4[i] = seq_array[i];
+        }
+        break;
+      case 4:
+        for (int i = 0; i < numsteps; i++) {
+          seq5[i] = seq_array[i];
+        }
+        break;
+      case 5:
+        for (int i = 0; i < numsteps; i++) {
+          seq6[i] = seq_array[i];
+        }
+        break;
+      case 6:
+        for (int i = 0; i < numsteps; i++) {
+          seq7[i] = seq_array[i];
+        }
+        break;
+      case 7:
+        for (int i = 0; i < numsteps; i++) {
+          seq8[i] = seq_array[i];
+        }
+        break;
+      default:
+        break;
+    }
+  }
+  Serial.println(F("BANK2_reset"));
+  DynamicJsonDocument doc2(8192);  // assistant said 6144
+  DeserializationError error2 = deserializeJson(doc2, BANK2);
+  if (error2) {
+    Serial.print(F("BANK2_reset: deserialize failed: "));
+    Serial.println(error.c_str());
+    return;
+  }
+  for (int j = 0; j < numseqs; j++) {
+    JsonArray vel_array = doc2[j];
+    switch (j){
+      case 0:
+        for (int i = 0; i < numsteps; i++) {
+          vel1[i] = vel_array[i];
+        }
+        break;
+      case 1:
+        for (int i = 0; i < numsteps; i++) {
+          vel2[i] = vel_array[i];
+        }
+        break;
+      case 2:
+        for (int i = 0; i < numsteps; i++) {
+          vel3[i] = vel_array[i];
+        }
+        break;
+      case 3:
+        for (int i = 0; i < numsteps; i++) {
+          vel4[i] = vel_array[i];
+        }
+        break;
+      case 4:
+        for (int i = 0; i < numsteps; i++) {
+          vel5[i] = vel_array[i];
+        }
+        break;
+      case 5:
+        for (int i = 0; i < numsteps; i++) {
+          vel6[i] = vel_array[i];
+        }
+        break;
+      case 6:
+        for (int i = 0; i < numsteps; i++) {
+          vel7[i] = vel_array[i];
+        }
+        break;
+      case 7:
+        for (int i = 0; i < numsteps; i++) {
+          vel8[i] = vel_array[i];
+        }
+        break;
+      default:
+        break;
+    }
+  }
+  Serial.println(F("BANK3_reset"));
+  DynamicJsonDocument doc3(8192);  // assistant said 6144
+  DeserializationError error3 = deserializeJson(doc3, BANK3);
+  if (error3) {
+    Serial.print(F("BANK3_reset: deserialize failed: "));
+    Serial.println(error.c_str());
+    return;
+  }
+  JsonArray set_array = doc3[0];
+  tempo = set_array[0];
+  cfg.step_size = set_array[1];
+  sequences_write();
+  trellis.show();
 }
 
 // read all sequences from "disk"
 void sequences_read() {
-  Serial.println("sequences_read");
+  Serial.println(F("sequences_read"));
   DynamicJsonDocument doc(8192);  // assistant said 6144
 
-  Serial.println("sequences_read: no sequences file. Using ROM default...");
-  DeserializationError error = deserializeJson(doc, "[[[60, 127, 10, true], [52, 127, 4, false], [60, 127, 8, true], [60, 127, 8, true], [72, 127, 14, true], [46, 127, 8, false], [60, 127, 8, false], [48, 127, 14, true]], [[53, 127, 10, true], [64, 127, 5, true], [65, 127, 4, true], [72, 127, 5, true], [60, 127, 8, true], [48, 127, 7, false], [48, 127, 3, false], [53, 127, 12, true]], [[48, 127, 14, true], [52, 127, 8, false], [67, 127, 8, true], [69, 127, 8, true], [65, 127, 15, true], [55, 127, 14, false], [55, 127, 14, true], [44, 127, 4, true]], [[60, 127, 14, true], [52, 127, 8, false], [69, 127, 8, true], [67, 127, 8, true], [65, 127, 15, true], [55, 127, 14, false], [62, 127, 14, true], [43, 127, 4, false]], [[60, 127, 14, true], [72, 127, 8, false], [67, 127, 8, true], [65, 127, 8, false], [60, 127, 8, true], [36, 127, 14, false], [55, 127, 14, false], [48, 127, 8, true]], [[59, 127, 14, true], [47, 127, 8, false], [67, 127, 8, true], [67, 127, 8, false], [59, 127, 8, true], [47, 127, 14, false], [59, 127, 14, true], [47, 127, 8, false]], [[53, 127, 14, true], [52, 127, 8, false], [53, 127, 8, true], [54, 127, 8, false], [55, 127, 8, true], [56, 127, 14, false], [57, 127, 14, true], [58, 127, 8, false]], [[48, 127, 14, true], [52, 127, 8, false], [53, 127, 8, true], [54, 127, 8, false], [55, 127, 8, true], [56, 127, 14, false], [57, 127, 14, true], [58, 127, 8, false]]]");
-  if (error) {
-    Serial.print("sequences_read: deserialize default failed: ");
-    Serial.println(error.c_str());
-    return;
+  File32 file = fatfs.open(save_file, FILE_READ);
+  if (!file) {
+    Serial.println(F("sequences_read: no sequences file. Using ROM default..."));
+    DeserializationError error = deserializeJson(doc, BANK1);
+    if (error) {
+      Serial.print(F("sequences_read: deserialize default failed: "));
+      Serial.println(error.c_str());
+      return;
+    }
+  } else {
+    DeserializationError error = deserializeJson(doc, file);  // inputLength);
+    if (error) {
+      Serial.print(F("sequences_read: deserialize failed: "));
+      Serial.println(error.c_str());
+      return;
+    }
   }
   
   for (int j = 0; j < numseqs; j++) {
     JsonArray seq_array = doc[j];
-    for (int i = 0; i < numsteps; i++) {
-      JsonArray step_array = seq_array[i];
-      Step s;
-      s.note = step_array[0];
-      s.vel = step_array[1];
-      s.gate = step_array[2];
-      s.on = step_array[3];
-      sequences[j][i] = s;
+    switch (j){
+      case 0:
+        for (int i = 0; i < numsteps; i++) {
+          seq1[i] = seq_array[i];
+        }
+        break;
+      case 1:
+        for (int i = 0; i < numsteps; i++) {
+          seq2[i] = seq_array[i];
+        }
+        break;
+      case 2:
+        for (int i = 0; i < numsteps; i++) {
+          seq3[i] = seq_array[i];
+        }
+        break;
+      case 3:
+        for (int i = 0; i < numsteps; i++) {
+          seq4[i] = seq_array[i];
+        }
+        break;
+      case 4:
+        for (int i = 0; i < numsteps; i++) {
+          seq5[i] = seq_array[i];
+        }
+        break;
+      case 5:
+        for (int i = 0; i < numsteps; i++) {
+          seq6[i] = seq_array[i];
+        }
+        break;
+      case 6:
+        for (int i = 0; i < numsteps; i++) {
+          seq7[i] = seq_array[i];
+        }
+        break;
+      case 7:
+        for (int i = 0; i < numsteps; i++) {
+          seq8[i] = seq_array[i];
+        }
+        break;
+      default:
+        break;
     }
   }
+  file.close();
+  trellis.show();
+}
+// read all velocities from "disk"
+void velocities_read() {
+  Serial.println(F("velocities_read"));
+  DynamicJsonDocument doc(8192);  // assistant said 6144
+
+  File32 file = fatfs.open(save_file2, FILE_READ);
+  if (!file) {
+    Serial.println(F("velocities_read: no sequences file. Using ROM default..."));
+    DeserializationError error = deserializeJson(doc, BANK2);
+    if (error) {
+      Serial.print(F("velocities_read: deserialize default failed: "));
+      Serial.println(error.c_str());
+      return;
+    }
+  } else {
+    DeserializationError error = deserializeJson(doc, file);  // inputLength);
+    if (error) {
+      Serial.print(F("velocities_read: deserialize failed: "));
+      Serial.println(error.c_str());
+      return;
+    }
+  }
+  
+  for (int j = 0; j < numseqs; j++) {
+    JsonArray vel_array = doc[j];
+    switch (j){
+      case 0:
+        for (int i = 0; i < numsteps; i++) {
+          vel1[i] = vel_array[i];
+        }
+        break;
+      case 1:
+        for (int i = 0; i < numsteps; i++) {
+          vel2[i] = vel_array[i];
+        }
+        break;
+      case 2:
+        for (int i = 0; i < numsteps; i++) {
+          vel3[i] = vel_array[i];
+        }
+        break;
+      case 3:
+        for (int i = 0; i < numsteps; i++) {
+          vel4[i] = vel_array[i];
+        }
+        break;
+      case 4:
+        for (int i = 0; i < numsteps; i++) {
+          vel5[i] = vel_array[i];
+        }
+        break;
+      case 5:
+        for (int i = 0; i < numsteps; i++) {
+          vel6[i] = vel_array[i];
+        }
+        break;
+      case 6:
+        for (int i = 0; i < numsteps; i++) {
+          vel7[i] = vel_array[i];
+        }
+        break;
+      case 7:
+        for (int i = 0; i < numsteps; i++) {
+          vel8[i] = vel_array[i];
+        }
+        break;
+      default:
+        break;
+    }
+  }
+  file.close();
+  trellis.show();
+}
+
+void settings_read() {
+  Serial.println(F("settings_read"));
+  DynamicJsonDocument doc(8192);  // assistant said 6144
+
+  File32 file = fatfs.open(save_file3, FILE_READ);
+  if (!file) {
+    Serial.println(F("settings_read: no settings file. Using ROM default..."));
+    DeserializationError error = deserializeJson(doc, BANK3);
+    if (error) {
+      Serial.print(F("settings_read: deserialize default failed: "));
+      Serial.println(error.c_str());
+      return;
+    }
+  } else {
+    DeserializationError error = deserializeJson(doc, file);  // inputLength);
+    if (error) {
+      Serial.print(F("settings_read: deserialize failed: "));
+      Serial.println(error.c_str());
+      return;
+    }
+  }
+  
+  JsonArray set_array = doc[0];
+  tempo = set_array[0];
+  cfg.step_size = set_array[1];
+  file.close();
+  trellis.show();
 }
 
 // Load a single sequence from into the sequencer from RAM storage
@@ -63,11 +504,25 @@ void sequence_load(int seq_num) {
   seqr.seqno = seq_num;
 }
 
-// Store current sequence in sequencer to RAM storage"""
-void sequence_save(int seq_num) {
-  Serial.printf("sequence_save:%d\n", seq_num);
-  for (int i = 0; i < numsteps; i++) {
-    sequences[seq_num][i] = seqr.steps[i];
-    ;
+// General Storage bits...
+// List flash content
+void flash_store(){
+  if (!fatfs.exists(D_FLASH)) {
+    Serial.println(F("" D_FLASH " directory not found, creating..."));
+
+    // Use mkdir to create directory (note you should _not_ have a trailing
+    // slash).
+    fatfs.mkdir(D_FLASH);
+
+    if (!fatfs.exists(D_FLASH)) {
+      Serial.println(F("Error, failed to create " D_FLASH " directory!"));
+      while (1) {
+        yield();
+      }
+    } else {
+      Serial.println(F("Created " D_FLASH " directory!"));
+    }
+  } else {
+    Serial.println(F("Mounted " D_FLASH " directory!"));
   }
 }

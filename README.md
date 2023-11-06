@@ -7,11 +7,17 @@ Designed for use with the Adafruit 8x8 Neotrellis Feather M4 Kit, no additional 
 - UK: https://thepihut.com/products/adafruit-untztrument-open-source-8x8-grid-controller-kit-8x8-white-leds
 
 NeoTrellis Surface...
+
+![Neotrellis Keys](https://apatchworkboy.com/wp-content/uploads/2023/11/Screenshot-2023-11-06-at-16.21.02.png)
+
 - Row 1 - 4: Steps 1 thru 32 (pattern edit: on/off, velocity edit: cycle thru velocity 40 / 80 / 127)
 - Row 5: Pattern Edit - Trk1 | Trk2 | Trk3 | Trk4 | Trk5 | Trk6 | Trk7 | Trk8
 - Row 6: Velocity Map Edit - Trk1 | Trk2 | Trk3 | Trk4 | Trk5 | Trk6 | Trk7 | Trk8
-- Row 7:
-- Bottom row: Toggle Play/Stop | Stop | Pause (iffy, don't bother) | Reset | - | - | Tempo down | Tempo up
+- Row 7: - | - | - | - | - | - | - | toggle step size - quarter / eighth / sixteenth
+- Bottom row: Toggle Play/Stop | Stop | Reset | SAVE | FACTORY RESET | MIDICLOCK Send On/Off | Tempo down | Tempo up
+
+- SAVE: store all patterns, velocity maps, current step-size and tempo to flash.
+- FACTORY RESET: resets all patterns & velocity maps to default, step size to sixteenths, tempo to 120.
 
 Outputs self-generated MIDI Clock (24 PPQN), Play/Stop/Cont (ideal for use in VCV rack with MIDI > CV module)
 - Default BPM: 120, adjustable via Tempo down / up buttons in -/+ 1 increments
@@ -29,9 +35,5 @@ Mapping for VCVRack MIDI > Gate module:
 - Play: Note C3 (48)
 - Stop: Note C#3 (49)
 - Reset: Note D#3 (51)
-
-To Do: Save & Load 16 sets of pattern-banks.
-
-Map Save & Load buttons to remaining bottom row slots. Use Row 6 & 7 for pattern-bank selection.
 
 FAR from perfect. Open to improvements - throw me a pull request.
