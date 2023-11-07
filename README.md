@@ -1,7 +1,7 @@
 # Neotrellis-Trigger-Sequencer
 [![YouTube Demo Video](http://img.youtube.com/vi/L5sNkB95-T4/0.jpg)](http://www.youtube.com/watch?v=L5sNkB95-T4 "Demo Video")
 
-An 8 track 32 step MIDI (over USB) gate/trigger sequencer and MIDI Clock Generator for Feather M4 Express / Neotrellis 8x8
+An 8 track 32 step MIDI (over USB) gate/trigger sequencer and MIDI Clock Generator for Feather M4 Express / Neotrellis 8x8 featuring per-step per-track velocity, probability, performance mutes and length control.
 Adapted from https://github.com/todbot/picostepseq/
 
 Designed for use with the Adafruit 8x8 Neotrellis Feather M4 Kit, no additional hardware required - 
@@ -10,16 +10,16 @@ Designed for use with the Adafruit 8x8 Neotrellis Feather M4 Kit, no additional 
 
 NeoTrellis Surface...
 
-![Neotrellis Keys](https://apatchworkboy.com/wp-content/uploads/2023/11/Screenshot-2023-11-07-at-14.37.27.png)
+![Neotrellis Keys](https://apatchworkboy.com/wp-content/uploads/2023/11/Screenshot-2023-11-07-at-16.05.14.png)
 
 - Row 1 - 4: Steps 1 thru 32 (pattern edit: on/off, velocity edit: cycle thru velocity 40 / 80 / 127, Length: select end step, Probability: 10% - 100% in 10% increments)
-- Row 5: Pattern Edit - Trk1 | Trk2 | Trk3 | Trk4 | Trk5 | Trk6 | Trk7 | Trk8
-- Row 6: Velocity Map Edit - Trk1 | Trk2 | Trk3 | Trk4 | Trk5 | Trk6 | Trk7 | Trk8
-- Row 7: - | - | - | - | Probability Map | Octave 0/+1/+2 (only while stopped) | Global Pattern Length | toggle step size - quarter / eighth / sixteenth
-- Bottom row: Toggle Play/Stop | Stop | Reset | SAVE | FACTORY RESET | MIDICLOCK Send On/Off | Tempo down | Tempo up
+- Row 5: Track Select - Trk1 | Trk2 | Trk3 | Trk4 | Trk5 | Trk6 | Trk7 | Trk8
+- Row 6: Track Mutes - Trk1 | Trk2 | Trk3 | Trk4 | Trk5 | Trk6 | Trk7 | Trk8
+- Row 7: Pattern Edit | Velocity Edit | Probability Edit | - | - | Octave 0/+1/+2 (only while stopped) | Global Pattern Length | toggle step size - quarter / eighth / sixteenth
+- Row 8: Toggle Play/Stop | Stop | Reset | SAVE | FACTORY RESET | MIDICLOCK Send On/Off | Tempo down | Tempo up
 
 - SAVE: store all patterns, velocity maps, current step-size and tempo to flash.
-- FACTORY RESET: resets all patterns & velocity maps to default, step size to sixteenths, tempo to 120.
+- FACTORY RESET: resets all patterns & velocity & probability maps to default, step size to sixteenths, tempo to 120, transpose to 0.
 
 Outputs self-generated MIDI Clock (24 PPQN), Play/Stop/Cont (ideal for use in VCV rack with MIDI > CV module)
 - Default BPM: 120, adjustable via Tempo down / up buttons in -/+ 1 increments
