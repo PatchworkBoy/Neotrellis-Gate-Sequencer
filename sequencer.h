@@ -206,46 +206,8 @@ public:
           color = prob8[laststep] < 10 ? Wheel(prob8[laststep]*10) : PINK;
           break;
       }
-    } else {
+    } else if (veledit == 1){
       switch (sel_track) {
-        case 0:
-          break;
-        case 1:
-          hit = seq1[stepi] > 0 ? PURPLE : W100;
-          color = seq1[laststep] > 0 ? RED : W10;
-          break;
-        case 2:
-          hit = seq2[stepi] > 0 ? PURPLE : W100;
-          color = seq2[laststep] > 0 ? ORANGE : W10;
-          break;
-        case 3:
-          hit = seq3[stepi] > 0 ? PURPLE : W100;
-          color = seq3[laststep] > 0 ? YELLOW : W10;
-          break;
-        case 4:
-          hit = seq4[stepi] > 0 ? PURPLE : W100;
-          color = seq4[laststep] > 0 ? GREEN : W10;
-          break;
-        case 5:
-          hit = seq5[stepi] > 0 ? PURPLE : W100;
-          color = seq5[laststep] > 0 ? CYAN : W10;
-          break;
-        case 6:
-          hit = seq6[stepi] > 0 ? PURPLE : W100;
-          color = seq6[laststep] > 0 ? BLUE : W10;
-          break;
-        case 7:
-          hit = seq7[stepi] > 0 ? CYAN : W100;
-          color = seq7[laststep] > 0 ? PURPLE : W10;
-          break;
-        case 8:
-          hit = seq8[stepi] > 0 ? BLUE : W100;
-          color = seq8[laststep] > 0 ? PINK : W10;
-          break;
-        default:
-          break;
-      }
-      switch (velocity) {
         case 0:
           break;
         case 1:
@@ -387,6 +349,45 @@ public:
         default:
           break;
       }
+    } else {
+      switch (sel_track) {
+        case 0:
+          break;
+        case 1:
+          hit = seq1[stepi] > 0 ? PURPLE : W100;
+          color = seq1[laststep] > 0 ? RED : W10;
+          break;
+        case 2:
+          hit = seq2[stepi] > 0 ? PURPLE : W100;
+          color = seq2[laststep] > 0 ? ORANGE : W10;
+          break;
+        case 3:
+          hit = seq3[stepi] > 0 ? PURPLE : W100;
+          color = seq3[laststep] > 0 ? YELLOW : W10;
+          break;
+        case 4:
+          hit = seq4[stepi] > 0 ? PURPLE : W100;
+          color = seq4[laststep] > 0 ? GREEN : W10;
+          break;
+        case 5:
+          hit = seq5[stepi] > 0 ? PURPLE : W100;
+          color = seq5[laststep] > 0 ? CYAN : W10;
+          break;
+        case 6:
+          hit = seq6[stepi] > 0 ? PURPLE : W100;
+          color = seq6[laststep] > 0 ? BLUE : W10;
+          break;
+        case 7:
+          hit = seq7[stepi] > 0 ? CYAN : W100;
+          color = seq7[laststep] > 0 ? PURPLE : W10;
+          break;
+        case 8:
+          hit = seq8[stepi] > 0 ? BLUE : W100;
+          color = seq8[laststep] > 0 ? PINK : W10;
+          break;
+        default:
+          break;
+      }
     }
     trellis.setPixelColor(stepi,hit);
     trellis.setPixelColor(laststep, color);
@@ -419,14 +420,14 @@ public:
       outcomes[7] = random(10)<=(prob8[stepi]);
     }
 
-    on_func(track_notes[0]+transpose, vel1[stepi], 5, seq1[stepi] == 1 ? outcomes[0] : false);
-    on_func(track_notes[1]+transpose, vel2[stepi], 5, seq2[stepi] == 1 ? outcomes[1] : false);
-    on_func(track_notes[2]+transpose, vel3[stepi], 5, seq3[stepi] == 1 ? outcomes[2] : false);
-    on_func(track_notes[3]+transpose, vel4[stepi], 5, seq4[stepi] == 1 ? outcomes[3] : false);
-    on_func(track_notes[4]+transpose, vel5[stepi], 5, seq5[stepi] == 1 ? outcomes[4] : false);
-    on_func(track_notes[5]+transpose, vel6[stepi], 5, seq6[stepi] == 1 ? outcomes[5] : false);
-    on_func(track_notes[6]+transpose, vel7[stepi], 5, seq7[stepi] == 1 ? outcomes[6] : false);
-    on_func(track_notes[7]+transpose, vel8[stepi], 5, seq8[stepi] == 1 ? outcomes[7] : false);
+    on_func(track_notes[0]+transpose, vel1[stepi], 5, seq1[stepi] == 1 && mutes[0] == 0 ? outcomes[0] : false);
+    on_func(track_notes[1]+transpose, vel2[stepi], 5, seq2[stepi] == 1 && mutes[1] == 0 ? outcomes[1] : false);
+    on_func(track_notes[2]+transpose, vel3[stepi], 5, seq3[stepi] == 1 && mutes[2] == 0 ? outcomes[2] : false);
+    on_func(track_notes[3]+transpose, vel4[stepi], 5, seq4[stepi] == 1 && mutes[3] == 0 ? outcomes[3] : false);
+    on_func(track_notes[4]+transpose, vel5[stepi], 5, seq5[stepi] == 1 && mutes[4] == 0 ? outcomes[4] : false);
+    on_func(track_notes[5]+transpose, vel6[stepi], 5, seq6[stepi] == 1 && mutes[5] == 0 ? outcomes[5] : false);
+    on_func(track_notes[6]+transpose, vel7[stepi], 5, seq7[stepi] == 1 && mutes[6] == 0 ? outcomes[6] : false);
+    on_func(track_notes[7]+transpose, vel8[stepi], 5, seq8[stepi] == 1 && mutes[7] == 0 ? outcomes[7] : false);
 
     uint32_t micros_per_step = ticks_per_step * tick_micros;
     uint32_t gate_micros = 5 * micros_per_step / 16;  // s.gate is arbitary 0-15 value

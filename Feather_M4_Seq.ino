@@ -238,10 +238,11 @@ int prob8[] = {
   10,10,10,10,10,10,10,10,
   10,10,10,10,10,10,10,10
 };
+int mutes[] = {0,0,0,0,0,0,0,0};
 int currstep = 0;
 int laststep = 0;
-int editing = 1;
-int velocity = 0;
+int patedit = 1;
+int veledit = 0;
 int lenedit = 0;
 int probedit = 0;
 int transpose = 0;
@@ -403,59 +404,54 @@ uint32_t Wheel(byte WheelPos) {
 }
 
 void show_sequence(int seq) {
+  patedit = 1;
   switch (seq) {
     case 1:
       for (int i = 0; i < 32; i++) {
         trellis.setPixelColor(i,seq1[i] > 0 ? RED : W10);
       }
-      trellis.show();
       break;
     case 2:
       for (int i = 0; i < 32; i++) {
         trellis.setPixelColor(i,seq2[i] > 0 ? ORANGE : W10);
       }
-      trellis.show();
       break;
     case 3:
       for (int i = 0; i < 32; i++) {
         trellis.setPixelColor(i,seq3[i] > 0 ? YELLOW : W10);
       }
-      trellis.show();
       break;
     case 4:
       for (int i = 0; i < 32; i++) {
         trellis.setPixelColor(i,seq4[i] > 0 ? GREEN : W10);
       }
-      trellis.show();
       break;
     case 5:
       for (int i = 0; i < 32; i++) {
         trellis.setPixelColor(i,seq5[i] > 0 ? CYAN : W10);
       }
-      trellis.show();
       break;
     case 6:
       for (int i = 0; i < 32; i++) {
         trellis.setPixelColor(i,seq6[i] > 0 ? BLUE : W10);
       }
-      trellis.show();
       break;
     case 7:
       for (int i = 0; i < 32; i++) {
         trellis.setPixelColor(i,seq7[i] > 0 ? PURPLE : W10);
       }
-      trellis.show();
       break;
     case 8:
       for (int i = 0; i < 32; i++) {
         trellis.setPixelColor(i,seq8[i] > 0 ? PINK : W10);
       }
-      trellis.show();
       break;
-  } 
+  }
+  if (run == 0) {trellis.show();} 
 }
 
 void show_probabilities(int seq) {
+  probedit = 1;
   int col = 0;
   switch (seq){
     case 1:
@@ -507,10 +503,11 @@ void show_probabilities(int seq) {
       }
       break;
   }
-  trellis.show();     
+  if (run == 0) {trellis.show();}
 }
 
 void show_accents(int seq) {
+  veledit = 1;
   int col = 0;
   switch (seq) {
     case 1:
@@ -531,7 +528,6 @@ void show_accents(int seq) {
         }
         trellis.setPixelColor(i,col);
       }
-      trellis.show();
       break;
     case 2:
       for (int i = 0; i < 32; i++) {
@@ -551,7 +547,6 @@ void show_accents(int seq) {
         }
         trellis.setPixelColor(i,col);
       }
-      trellis.show();
       break;
     case 3:
       for (int i = 0; i < 32; i++) {
@@ -571,7 +566,6 @@ void show_accents(int seq) {
         }
         trellis.setPixelColor(i,col);
       }
-      trellis.show();
       break;
     case 4:
       for (int i = 0; i < 32; i++) {
@@ -591,7 +585,6 @@ void show_accents(int seq) {
         }
         trellis.setPixelColor(i,col);
       }
-      trellis.show();
       break;
     case 5:
       for (int i = 0; i < 32; i++) {
@@ -611,7 +604,6 @@ void show_accents(int seq) {
         }
         trellis.setPixelColor(i,col);
       }
-      trellis.show();
       break;
     case 6:
       for (int i = 0; i < 32; i++) {
@@ -631,7 +623,6 @@ void show_accents(int seq) {
         }
         trellis.setPixelColor(i,col);
       }
-      trellis.show();
       break;
     case 7:
       for (int i = 0; i < 32; i++) {
@@ -651,7 +642,6 @@ void show_accents(int seq) {
         }
         trellis.setPixelColor(i,col);
       }
-      trellis.show();
       break;
     case 8:
       for (int i = 0; i < 32; i++) {
@@ -671,11 +661,11 @@ void show_accents(int seq) {
         }
         trellis.setPixelColor(i,col);
       }
-      trellis.show();
       break;
     default:
       break;
-  } 
+  }
+  if (run == 0) {trellis.show();}
 }
 
 TrellisCallback onKey(keyEvent evt) {
@@ -757,110 +747,8 @@ TrellisCallback onKey(keyEvent evt) {
             break;
         }
         if (run == 0){trellis.show();}
-      } else if (keyId < 32) {
-        switch (editing){
-          case 0:
-            break;
-          case 1:
-            switch (seq1[keyId]){
-              case 1:
-                trellis.setPixelColor(keyId,W10);
-                seq1[keyId] = 0;
-                break;
-              case 0:
-                trellis.setPixelColor(keyId,RED);
-                seq1[keyId] = 1;
-                break;
-            }
-            break;
-          case 2:
-            switch (seq2[keyId]){
-              case 1:
-                trellis.setPixelColor(keyId,W10);
-                seq2[keyId] = 0;
-                break;
-              case 0:
-                trellis.setPixelColor(keyId,ORANGE);
-                seq2[keyId] = 1;
-                break;
-            }
-            break;
-          case 3:
-            switch (seq3[keyId]){
-              case 1:
-                trellis.setPixelColor(keyId,W10);
-                seq3[keyId] = 0;
-                break;
-              case 0:
-                trellis.setPixelColor(keyId,YELLOW);
-                seq3[keyId] = 1;
-                break;
-            }
-            break;
-          case 4:
-            switch (seq4[keyId]){
-              case 1:
-                trellis.setPixelColor(keyId,W10);
-                seq4[keyId] = 0;
-                break;
-              case 0:
-                trellis.setPixelColor(keyId,GREEN);
-                seq4[keyId] = 1;
-                break;
-            }
-            break;
-          case 5:
-            switch (seq5[keyId]){
-              case 1:
-                trellis.setPixelColor(keyId,W10);
-                seq5[keyId] = 0;
-                break;
-              case 0:
-                trellis.setPixelColor(keyId,CYAN);
-                seq5[keyId] = 1;
-                break;
-            }
-            break;
-          case 6:
-            switch (seq6[keyId]){
-              case 1:
-                trellis.setPixelColor(keyId,W10);
-                seq6[keyId] = 0;
-                break;
-              case 0:
-                trellis.setPixelColor(keyId,BLUE);
-                seq6[keyId] = 1;
-                break;
-            }
-            break;
-          case 7:
-            switch (seq7[keyId]){
-              case 1:
-                trellis.setPixelColor(keyId,W10);
-                seq7[keyId] = 0;
-                break;
-              case 0:
-                trellis.setPixelColor(keyId,PURPLE);
-                seq7[keyId] = 1;
-                break;
-            }
-            break;
-          case 8:
-            switch (seq8[keyId]){
-              case 1:
-                trellis.setPixelColor(keyId,W10);
-                seq8[keyId] = 0;
-                break;
-              case 0:
-                trellis.setPixelColor(keyId,PINK);
-                seq8[keyId] = 1;
-                break;
-            }
-            break;
-          default:
-            break;
-        }
-        switch (velocity){
+      } else if (veledit == 1 & keyId < 32) {
+        switch (sel_track){
           case 0:
             break;
           case 1:
@@ -1010,15 +898,125 @@ TrellisCallback onKey(keyEvent evt) {
           default:
             break;
         }
+      } else if (keyId < 32) {
+        switch (sel_track){
+          case 0:
+            break;
+          case 1:
+            switch (seq1[keyId]){
+              case 1:
+                trellis.setPixelColor(keyId,W10);
+                seq1[keyId] = 0;
+                break;
+              case 0:
+                trellis.setPixelColor(keyId,RED);
+                seq1[keyId] = 1;
+                break;
+            }
+            break;
+          case 2:
+            switch (seq2[keyId]){
+              case 1:
+                trellis.setPixelColor(keyId,W10);
+                seq2[keyId] = 0;
+                break;
+              case 0:
+                trellis.setPixelColor(keyId,ORANGE);
+                seq2[keyId] = 1;
+                break;
+            }
+            break;
+          case 3:
+            switch (seq3[keyId]){
+              case 1:
+                trellis.setPixelColor(keyId,W10);
+                seq3[keyId] = 0;
+                break;
+              case 0:
+                trellis.setPixelColor(keyId,YELLOW);
+                seq3[keyId] = 1;
+                break;
+            }
+            break;
+          case 4:
+            switch (seq4[keyId]){
+              case 1:
+                trellis.setPixelColor(keyId,W10);
+                seq4[keyId] = 0;
+                break;
+              case 0:
+                trellis.setPixelColor(keyId,GREEN);
+                seq4[keyId] = 1;
+                break;
+            }
+            break;
+          case 5:
+            switch (seq5[keyId]){
+              case 1:
+                trellis.setPixelColor(keyId,W10);
+                seq5[keyId] = 0;
+                break;
+              case 0:
+                trellis.setPixelColor(keyId,CYAN);
+                seq5[keyId] = 1;
+                break;
+            }
+            break;
+          case 6:
+            switch (seq6[keyId]){
+              case 1:
+                trellis.setPixelColor(keyId,W10);
+                seq6[keyId] = 0;
+                break;
+              case 0:
+                trellis.setPixelColor(keyId,BLUE);
+                seq6[keyId] = 1;
+                break;
+            }
+            break;
+          case 7:
+            switch (seq7[keyId]){
+              case 1:
+                trellis.setPixelColor(keyId,W10);
+                seq7[keyId] = 0;
+                break;
+              case 0:
+                trellis.setPixelColor(keyId,PURPLE);
+                seq7[keyId] = 1;
+                break;
+            }
+            break;
+          case 8:
+            switch (seq8[keyId]){
+              case 1:
+                trellis.setPixelColor(keyId,W10);
+                seq8[keyId] = 0;
+                break;
+              case 0:
+                trellis.setPixelColor(keyId,PINK);
+                seq8[keyId] = 1;
+                break;
+            }
+            break;
+          default:
+            break;
+        }
       } else {
         switch (keyId){
           case 32:
             sel_track = 1;
             if (probedit == 1) {
+              patedit = 0;
+              veledit = 0;
               show_probabilities(sel_track);
+            } else if (veledit == 1){
+              patedit = 0;
+              probedit = 0;
+              show_accents(sel_track);
             } else {
-              editing = 1;
-              velocity = 0;
+              patedit = 1;
+              probedit = 0;
+              veledit = 0;
               show_sequence(sel_track);
             }
             break;
@@ -1026,9 +1024,14 @@ TrellisCallback onKey(keyEvent evt) {
             sel_track = 2;
             if (probedit == 1) {
               show_probabilities(sel_track);
+            } else if (veledit == 1){
+              patedit = 0;
+              probedit = 0;
+              show_accents(sel_track);
             } else {
-              editing = 2;
-              velocity = 0;
+              patedit = 1;
+              probedit = 0;
+              veledit = 0;
               show_sequence(sel_track);
             }
             break;
@@ -1036,9 +1039,14 @@ TrellisCallback onKey(keyEvent evt) {
             sel_track = 3;
             if (probedit == 1) {
               show_probabilities(sel_track);
+            } else if (veledit == 1){
+              patedit = 0;
+              probedit = 0;
+              show_accents(sel_track);
             } else {
-              editing = 3;
-              velocity = 0;
+              patedit = 1;
+              probedit = 0;
+              veledit = 0;
               show_sequence(sel_track);
             }
             break;
@@ -1046,9 +1054,14 @@ TrellisCallback onKey(keyEvent evt) {
             sel_track = 4;
             if (probedit == 1) {
               show_probabilities(sel_track);
+            } else if (veledit == 1){
+              patedit = 0;
+              probedit = 0;
+              show_accents(sel_track);
             } else {
-              editing = 4;
-              velocity = 0;
+              patedit = 1;
+              probedit = 0;
+              veledit = 0;
               show_sequence(sel_track);
             }
             break;
@@ -1056,9 +1069,14 @@ TrellisCallback onKey(keyEvent evt) {
             sel_track = 5;
             if (probedit == 1) {
               show_probabilities(sel_track);
+            } else if (veledit == 1){
+              patedit = 0;
+              probedit = 0;
+              show_accents(sel_track);
             } else {
-              editing = 5;
-              velocity = 0;
+              patedit = 1;
+              probedit = 0;
+              veledit = 0;
               show_sequence(sel_track);
             }
             break;
@@ -1066,9 +1084,14 @@ TrellisCallback onKey(keyEvent evt) {
             sel_track = 6;
             if (probedit == 1) {
               show_probabilities(sel_track);
+            } else if (veledit == 1){
+              patedit = 0;
+              probedit = 0;
+              show_accents(sel_track);
             } else {
-              editing = 6;
-              velocity = 0;
+              patedit = 1;
+              probedit = 0;
+              veledit = 0;
               show_sequence(sel_track);
             }
             break;
@@ -1076,9 +1099,14 @@ TrellisCallback onKey(keyEvent evt) {
             sel_track = 7;
             if (probedit == 1) {
               show_probabilities(sel_track);
+            } else if (veledit == 1){
+              patedit = 0;
+              probedit = 0;
+              show_accents(sel_track);
             } else {
-              editing = 7;
-              velocity = 0;
+              patedit = 1;
+              probedit = 0;
+              veledit = 0;
               show_sequence(sel_track);
             }
             break;
@@ -1086,78 +1114,120 @@ TrellisCallback onKey(keyEvent evt) {
             sel_track = 8;
             if (probedit == 1) {
               show_probabilities(sel_track);
+            } else if (veledit == 1){
+              patedit = 0;
+              probedit = 0;
+              show_accents(sel_track);
             } else {
-              editing = 8;
-              velocity = 0;
+              patedit = 1;
+              probedit = 0;
+              veledit = 0;
               show_sequence(sel_track);
             }
             break;
           case 40:
-            if (probedit == 0) {
-              editing = 0;
-              velocity = 1;
-              show_accents(velocity);
+            if (mutes[0] == 0){
+              mutes[0] = 1;
+              trellis.setPixelColor(40,R80);
+            } else {
+              mutes[0] = 0;
+              trellis.setPixelColor(40,G80);
             }
             break;
           case 41:
-            if (probedit == 0) {
-              editing = 0;
-              velocity = 2;
-              show_accents(velocity);
+            if (mutes[1] == 0){
+              mutes[1] = 1;
+              trellis.setPixelColor(41,R80);
+            } else {
+              mutes[1] = 0;
+              trellis.setPixelColor(41,G80);
             }
             break;
           case 42:
-            if (probedit == 0) {
-              editing = 0;
-              velocity = 3;
-              show_accents(velocity);
+            if (mutes[2] == 0){
+              mutes[2] = 1;
+              trellis.setPixelColor(42,R80);
+            } else {
+              mutes[2] = 0;
+              trellis.setPixelColor(42,G80);
             }
             break;
           case 43:
-            if (probedit == 0) {
-              editing = 0;
-              velocity = 4;
-              show_accents(velocity);
+            if (mutes[3] == 0){
+              mutes[3] = 1;
+              trellis.setPixelColor(43,R80);
+            } else {
+              mutes[3] = 0;
+              trellis.setPixelColor(43,G80);
             }
             break;
           case 44:
-            if (probedit == 0) {
-              editing = 0;
-              velocity = 5;
-              show_accents(velocity);
+            if (mutes[4] == 0){
+              mutes[4] = 1;
+              trellis.setPixelColor(44,R80);
+            } else {
+              mutes[4] = 0;
+              trellis.setPixelColor(44,G80);
             }
             break;
           case 45:
-            if (probedit == 0) {
-              editing = 0;
-              velocity = 6;
-              show_accents(velocity);
+            if (mutes[5] == 0){
+              mutes[5] = 1;
+              trellis.setPixelColor(45,R80);
+            } else {
+              mutes[5] = 0;
+              trellis.setPixelColor(45,G80);
             }
             break;
           case 46:
-            if (probedit == 0) {
-              editing = 0;
-              velocity = 7;
-              show_accents(velocity);
+            if (mutes[6] == 0){
+              mutes[6] = 1;
+              trellis.setPixelColor(46,R80);
+            } else {
+              mutes[6] = 0;
+              trellis.setPixelColor(46,G80);
             }
             break;
           case 47:
-            if (probedit == 0) {
-              editing = 0;
-              velocity = 8;
-              show_accents(velocity);
+            if (mutes[7] == 0){
+              mutes[7] = 1;
+              trellis.setPixelColor(47,R80);
+            } else {
+              mutes[7] = 0;
+              trellis.setPixelColor(47,G80);
             }
             break;
-          case 52:
+          case 48:
+            if (patedit == 0) {
+              patedit = 1;
+              veledit = 0;
+              probedit = 0;
+              trellis.setPixelColor(48,R127);
+              trellis.setPixelColor(49,Y40);
+              trellis.setPixelColor(50,P40);
+              show_sequence(sel_track);
+            }
+            break;
+          case 49:
+            if (veledit == 0) {
+              veledit = 1;
+              patedit = 0;
+              probedit = 0;
+              trellis.setPixelColor(48,R40);
+              trellis.setPixelColor(49,Y127);
+              trellis.setPixelColor(50,P40);
+              show_accents(sel_track);
+            }
+            break;
+          case 50:
             if (probedit == 0) {
               probedit = 1;
-              trellis.setPixelColor(52,P127);
+              patedit = 0;
+              veledit = 0;
+              trellis.setPixelColor(48,R40);
+              trellis.setPixelColor(49,Y40);
+              trellis.setPixelColor(50,P127);
               show_probabilities(sel_track);
-            } else {
-              probedit = 0;
-              editing = sel_track;
-              trellis.setPixelColor(52,P40);
-              show_sequence(sel_track);
             }
             break;
           case 53:
@@ -1290,16 +1360,18 @@ void init_interface(){
   trellis.setPixelColor(38,PURPLE);
   trellis.setPixelColor(39,PINK);
   //Vel 1 > 8
-  trellis.setPixelColor(40,R80);
-  trellis.setPixelColor(41,O80);
-  trellis.setPixelColor(42,Y80);
-  trellis.setPixelColor(43,G80);
-  trellis.setPixelColor(44,C80);
-  trellis.setPixelColor(45,B80);
-  trellis.setPixelColor(46,P80);
-  trellis.setPixelColor(47,PK80);
+  trellis.setPixelColor(40,G40);
+  trellis.setPixelColor(41,G40);
+  trellis.setPixelColor(42,G40);
+  trellis.setPixelColor(43,G40);
+  trellis.setPixelColor(44,G40);
+  trellis.setPixelColor(45,G40);
+  trellis.setPixelColor(46,G40);
+  trellis.setPixelColor(47,G40);
   //
-  trellis.setPixelColor(52,probedit == 1 ? P127 : P40);
+  trellis.setPixelColor(48,R127);
+  trellis.setPixelColor(49,Y40);
+  trellis.setPixelColor(50,P40);
   switch (transpose) {
     case 0:
       trellis.setPixelColor(53,B40);
