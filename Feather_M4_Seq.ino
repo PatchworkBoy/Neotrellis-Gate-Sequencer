@@ -1439,6 +1439,7 @@ void setup() {
   
   sequences_read();
   velocities_read();
+  probabilities_read();
   settings_read();
   sequence_load(2);
   configure_sequencer();

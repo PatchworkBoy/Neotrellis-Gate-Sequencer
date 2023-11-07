@@ -85,7 +85,7 @@ void probabilities_write() {
   file.close();
   Serial.print(F("saved_probabilities_json = \""));
   serializeJson(doc, Serial);
-  Serial.println(F("\"\nvprobabilities saved"));
+  Serial.println(F("\"\nprobabilities saved"));
 }
 // write all settings to "disk"
 void settings_write() {
