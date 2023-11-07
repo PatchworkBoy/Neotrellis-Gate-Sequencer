@@ -9,7 +9,84 @@ const char* BANK1 = "[[1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0,0
 const char* BANK2 = "[[127,40,80,40,80,40,80,40,127,40,80,40,80,40,80,40,127,40,80,40,80,40,80,40,127,40,80,40,80,40,80,40],[80,40,80,40,127,40,80,40,80,40,80,40,127,40,80,40,80,40,80,40,127,40,80,40,80,40,80,40,127,40,80,40],[40,80,127,40,40,80,127,40,40,80,127,40,40,80,127,40,40,80,127,40,40,80,127,40,40,80,127,40,40,80,127,40],[127,40,80,40,80,40,80,40,127,40,80,40,80,40,80,40,127,40,80,40,80,40,80,40,127,40,80,40,80,40,80,40],[127,40,80,40,80,40,80,40,127,40,80,40,80,40,80,40,127,40,80,40,80,40,80,40,127,40,80,40,80,40,80,40],[127,40,80,40,80,40,80,40,127,40,80,40,80,40,80,40,127,40,80,40,80,40,80,40,127,40,80,40,80,40,80,40],[127,40,80,40,80,40,80,40,127,40,80,40,80,40,80,40,127,40,80,40,80,40,80,40,127,40,80,40,80,40,80,40],[127,40,80,40,80,40,80,40,127,40,80,40,80,40,80,40,127,40,80,40,80,40,80,40,127,40,80,40,80,40,80,40]]";
 // Tempo & StepSize & Transpose Factory Presets
 const char* BANK3 = "[[120,6,0]]";
+// Probability Presets
+const char* BANK4 = "[[10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10],[10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10],[10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10],[10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10],[10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10],[10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10],[10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10],[10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10]]";
+// write all probabilities to "disk"
+void probabilities_write() {
+  Serial.println(F("probabilities_write"));
+  last_sequence_write_millis = millis();
 
+  DynamicJsonDocument doc(8192);  // assistant said 6144
+  for (int j = 0; j < numseqs; j++) {
+    JsonArray prob_array = doc.createNestedArray();
+    switch (j){
+      case 0:
+        for (int i = 0; i < numsteps; i++) {
+          int s = prob1[i];
+          prob_array.add(s);
+        }
+        break;
+      case 1:
+        for (int i = 0; i < numsteps; i++) {
+          int s = prob2[i];
+          prob_array.add(s);
+        }
+        break;
+      case 2:
+        for (int i = 0; i < numsteps; i++) {
+          int s = prob3[i];
+          prob_array.add(s);
+        }
+        break;
+      case 3:
+        for (int i = 0; i < numsteps; i++) {
+          int s = prob4[i];
+          prob_array.add(s);
+        }
+        break;
+      case 4:
+        for (int i = 0; i < numsteps; i++) {
+          int s = prob5[i];
+          prob_array.add(s);
+        }
+        break;
+      case 5:
+        for (int i = 0; i < numsteps; i++) {
+          int s = prob6[i];
+          prob_array.add(s);
+        }
+        break;
+      case 6:
+        for (int i = 0; i < numsteps; i++) {
+          int s = prob7[i];
+          prob_array.add(s);
+        }
+        break;
+      case 7:
+        for (int i = 0; i < numsteps; i++) {
+          int s = prob8[i];
+          prob_array.add(s);
+        }
+        break;
+      default:
+        break;
+    }
+  }
+
+  fatfs.remove(save_file4);
+  File32 file = fatfs.open(save_file4, FILE_WRITE);
+  if (!file) {
+    Serial.println(F("probabilities_write: Failed to create file"));
+    return;
+  }
+  if (serializeJson(doc, file) == 0) {
+    Serial.println(F("probabilities_write: Failed to write to file"));
+  }
+  file.close();
+  Serial.print(F("saved_probabilities_json = \""));
+  serializeJson(doc, Serial);
+  Serial.println(F("\"\nvprobabilities saved"));
+}
 // write all settings to "disk"
 void settings_write() {
   Serial.println(F("settings_write"));
@@ -34,6 +111,7 @@ void settings_write() {
   Serial.print(F("saved_settings_json = \""));
   serializeJson(doc, Serial);
   Serial.println(F("\"\nsettings saved"));
+  probabilities_write();
 }
 // write all velocities to "disk"
 void velocities_write() {
@@ -317,6 +395,62 @@ void pattern_reset() {
   tempo = set_array[0];
   cfg.step_size = set_array[1];
   transpose = set_array[2];
+  
+  Serial.println(F("BANK4_reset"));
+  DynamicJsonDocument doc4(8192);  // assistant said 6144
+  DeserializationError error4 = deserializeJson(doc4, BANK4);
+  if (error4) {
+    Serial.print(F("BANK4_reset: deserialize failed: "));
+    Serial.println(error.c_str());
+    return;
+  }
+  for (int j = 0; j < numseqs; j++) {
+    JsonArray prob_array = doc4[j];
+    switch (j){
+      case 0:
+        for (int i = 0; i < numsteps; i++) {
+          prob1[i] = prob_array[i];
+        }
+        break;
+      case 1:
+        for (int i = 0; i < numsteps; i++) {
+          prob2[i] = prob_array[i];
+        }
+        break;
+      case 2:
+        for (int i = 0; i < numsteps; i++) {
+          prob3[i] = prob_array[i];
+        }
+        break;
+      case 3:
+        for (int i = 0; i < numsteps; i++) {
+          prob4[i] = prob_array[i];
+        }
+        break;
+      case 4:
+        for (int i = 0; i < numsteps; i++) {
+          prob5[i] = prob_array[i];
+        }
+        break;
+      case 5:
+        for (int i = 0; i < numsteps; i++) {
+          prob6[i] = prob_array[i];
+        }
+        break;
+      case 6:
+        for (int i = 0; i < numsteps; i++) {
+          prob7[i] = prob_array[i];
+        }
+        break;
+      case 7:
+        for (int i = 0; i < numsteps; i++) {
+          prob8[i] = prob_array[i];
+        }
+        break;
+      default:
+        break;
+    }
+  }
   sequences_write();
   trellis.show();
 }
@@ -458,6 +592,80 @@ void velocities_read() {
       case 7:
         for (int i = 0; i < numsteps; i++) {
           vel8[i] = vel_array[i];
+        }
+        break;
+      default:
+        break;
+    }
+  }
+  file.close();
+  trellis.show();
+}
+
+// read all probabilities from "disk"
+void probabilities_read() {
+  Serial.println(F("probabilities_read"));
+  DynamicJsonDocument doc(8192);  // assistant said 6144
+
+  File32 file = fatfs.open(save_file4, FILE_READ);
+  if (!file) {
+    Serial.println(F("probabilities_read: no sequences file. Using ROM default..."));
+    DeserializationError error = deserializeJson(doc, BANK4);
+    if (error) {
+      Serial.print(F("probabilities_read: deserialize default failed: "));
+      Serial.println(error.c_str());
+      return;
+    }
+  } else {
+    DeserializationError error = deserializeJson(doc, file);  // inputLength);
+    if (error) {
+      Serial.print(F("probabilities_read: deserialize failed: "));
+      Serial.println(error.c_str());
+      return;
+    }
+  }
+  
+  for (int j = 0; j < numseqs; j++) {
+    JsonArray prob_array = doc[j];
+    switch (j){
+      case 0:
+        for (int i = 0; i < numsteps; i++) {
+          prob1[i] = prob_array[i];
+        }
+        break;
+      case 1:
+        for (int i = 0; i < numsteps; i++) {
+          prob2[i] = prob_array[i];
+        }
+        break;
+      case 2:
+        for (int i = 0; i < numsteps; i++) {
+          prob3[i] = prob_array[i];
+        }
+        break;
+      case 3:
+        for (int i = 0; i < numsteps; i++) {
+          prob4[i] = prob_array[i];
+        }
+        break;
+      case 4:
+        for (int i = 0; i < numsteps; i++) {
+          prob5[i] = prob_array[i];
+        }
+        break;
+      case 5:
+        for (int i = 0; i < numsteps; i++) {
+          prob6[i] = prob_array[i];
+        }
+        break;
+      case 6:
+        for (int i = 0; i < numsteps; i++) {
+          prob7[i] = prob_array[i];
+        }
+        break;
+      case 7:
+        for (int i = 0; i < numsteps; i++) {
+          prob8[i] = prob_array[i];
         }
         break;
       default:
