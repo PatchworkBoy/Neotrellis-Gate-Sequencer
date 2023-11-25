@@ -3,6 +3,42 @@
 //
 
 uint32_t last_sequence_write_millis = 0;
+// write all notes to "disk"
+// write all velocities to "disk"
+void notes_write() {
+  Serial.println(F("notes_write"));
+  last_sequence_write_millis = millis();
+
+  for (uint8_t p = 0; p < numpresets; ++p){
+    Serial.println(p);
+    DynamicJsonDocument doc(8192);  // assistant said 6144
+    for (int j = 0; j < numseqs; j++) {
+      JsonArray notes_array = doc.createNestedArray();
+      for (int i = 0; i < numsteps; i++) {
+        int s = notes[p][j][i];
+        notes_array.add(s);
+      }
+    }
+    toggle_write();
+    fatfs.remove(nfiles[p]);
+    File32 nfile = fatfs.open(nfiles[p], FILE_WRITE);
+    if (!nfile) {
+      Serial.println(F("notes_write: Failed to create file"));
+      Serial.println(p);
+      return;
+    }
+    if (serializeJson(doc, nfile) == 0) {
+      Serial.println(F("notes_write: Failed to write to file"));
+      Serial.println(p);
+    }
+    nfile.close();
+    Serial.println(p);
+  }
+  Serial.println(F("notes saved"));
+  sure = 0;
+  init_interface();
+  show_sequence(sel_track);
+}
 
 // write all gates to "disk"
 void gates_write() {
@@ -17,6 +53,8 @@ void gates_write() {
         prob_array.add(s);
       }
     }
+
+    toggle_write();
     fatfs.remove(gfiles[p]);
     File32 file = fatfs.open(gfiles[p], FILE_WRITE);
     if (!file) {
@@ -34,8 +72,7 @@ void gates_write() {
     //serializeJson(doc, Serial);
   }
   Serial.println(F("gates saved"));
-  trellis.setPixelColor(59,C80);
-  trellis.show();
+  notes_write();
 }
 
 // write all probabilities to "disk"
@@ -53,6 +90,7 @@ void probabilities_write() {
       }
     }
 
+    toggle_write();
     fatfs.remove(prbfiles[p]);
     File32 file = fatfs.open(prbfiles[p], FILE_WRITE);
     if (!file) {
@@ -94,7 +132,14 @@ void settings_write() {
   }
   set_array.add(ctrl_chan);
   set_array.add(swing);
-
+  set_array.add(brightness);
+  for (uint8_t i = 0; i < 8; ++i){
+    set_array.add(modes[i]);
+  }
+  for (uint8_t i = 0; i < 2; ++i){
+    set_array.add(hzv[i]);
+  }
+  toggle_write();
   fatfs.remove(settings_file);
   File32 file = fatfs.open(settings_file, FILE_WRITE);
   if (!file) {
@@ -126,7 +171,7 @@ void velocities_write() {
         vels_array.add(s);
       }
     }
-
+    toggle_write();
     fatfs.remove(vfiles[p]);
     File32 vfile = fatfs.open(vfiles[p], FILE_WRITE);
     if (!vfile) {
@@ -166,7 +211,7 @@ void sequences_write() {
         seq_array.add(s);
       }
     }
-
+    toggle_write();
     fatfs.remove(pfiles[p]);
     File32 pfile = fatfs.open(pfiles[p], FILE_WRITE);
     if (!pfile) {
@@ -225,6 +270,23 @@ void pattern_reset() {
       }
     }
   }
+  Serial.println(F("note_bank_resets"));
+  for (uint8_t p = 0; p < numpresets; ++p){
+    DynamicJsonDocument docn(8192);  // assistant said 6144
+    DeserializationError errorn = deserializeJson(docn, notebanks[p]);
+    if (errorn) {
+      Serial.print(F("note_bank_reset: deserialize failed: "));
+      Serial.println(p);
+      Serial.println(errorn.c_str());
+      return;
+    }
+    for (int j = 0; j < numseqs; j++) {
+      JsonArray note_array = docn[j];
+      for (int i = 0; i < numsteps; i++) {
+        notes[p][j][i] = note_array[i];
+      }
+    }
+  }
   Serial.println(F("settings_reset"));
   DynamicJsonDocument doc3(8192);  // assistant said 6144
   DeserializationError error3 = deserializeJson(doc3, settings);
@@ -252,7 +314,16 @@ void pattern_reset() {
   }
   ctrl_chan = set_array[z];
   swing = set_array[z+1];
-  
+  brightness = set_array[z+2];
+  z = z + 3;
+  for (uint8_t i = 0; i < 8; ++i){
+    modes[i] = set_array[z] > 0 ? set_array[z] : TRIGATE;
+    z++;
+  }
+  for (uint8_t i = 0; i < 2; ++i){
+    hzv[i] = set_array[z];
+    z++;
+  }
   Serial.println(F("prob_bank_resets"));
   for (uint8_t p = 0; p < numpresets; ++p){
     DynamicJsonDocument doc4(8192);  // assistant said 6144
@@ -365,6 +436,43 @@ void velocities_read() {
     Serial.println(p);
   }
   Serial.println(F("All velocities loaded"));
+  trellis.show();
+}
+
+// read all velocities from "disk"
+void notes_read() {
+  Serial.println(F("notes_read"));
+  for (uint8_t p = 0; p < numpresets; ++p){
+    DynamicJsonDocument doc(8192);  // assistant said 6144
+
+    File32 file = fatfs.open(nfiles[p], FILE_READ);
+    if (!file) {
+      Serial.println(F("notes_read: no sequences file. Using ROM default..."));
+      DeserializationError error = deserializeJson(doc, notebanks[p]);
+      if (error) {
+        Serial.print(F("notes_read: deserialize default failed: "));
+        Serial.println(error.c_str());
+        return;
+      }
+    } else {
+      DeserializationError error = deserializeJson(doc, file);  // inputLength);
+      if (error) {
+        Serial.print(F("notes_read: deserialize failed: "));
+        Serial.println(error.c_str());
+        return;
+      }
+    }
+    
+    for (int j = 0; j < numseqs; j++) {
+      JsonArray note_array = doc[j];
+      for (int i = 0; i < numsteps; i++) {
+        notes[p][j][i] = note_array[i];
+      }
+    }
+    file.close();
+    Serial.println(p);
+  }
+  Serial.println(F("All notes loaded"));
   trellis.show();
 }
 
@@ -485,8 +593,18 @@ void settings_read() {
     track_chan[i] = set_array[z];
     z++;
   }
-  ctrl_chan = set_array[z];
-  swing = set_array[z+1];
+  ctrl_chan = set_array[z] > 0 ? set_array[z] : ctrl_chan ;
+  swing = set_array[z+1] > 0 ? set_array[z+1] : swing;
+  brightness = set_array[z+2] > 0 ? set_array[z+2] : brightness;
+  z = z + 3;
+  for (uint8_t i = 0; i < 8; ++i){
+    modes[i] = set_array[z] > 0 ? set_array[z] : TRIGATE;
+    z++;
+  }
+  for (uint8_t i = 0; i < 2; ++i){
+    hzv[i] = set_array[z];
+    z++;
+  }
   file.close();
   Serial.println("All settings loaded");
   trellis.show();

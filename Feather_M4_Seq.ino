@@ -1,5 +1,5 @@
 /**
- * Feather M4 Seq -- An 8 track 32 step MIDI Gate Sequencer for Feather M4 Express & Neotrellis 8x8
+ * Feather M4 Seq -- An 8 track 32 step MIDI (& Analog) Gate (& CV) Sequencer for Feather M4 Express & Neotrellis 8x8
  * 04 Nov 2023 - @apatchworkboy / Marci
  * 28 Apr 2023 - original via @todbot / Tod Kurt https://github.com/todbot/picostepseq/
  *
@@ -25,8 +25,11 @@
 #include <MIDI.h>
 #include <ArduinoJson.h>
 #include "flash_config.h"
-#include <array>
-using namespace std;
+
+// Serial Console logging...
+const bool midi_out_debug = false;
+const bool midi_in_debug = false;
+const bool marci_debug = false;
 
 Adafruit_SPIFlash flash(&flashTransport);
 FatVolume fatfs;
@@ -43,90 +46,76 @@ Adafruit_NeoTrellis t_array[Y_DIM / 4][X_DIM / 4] = {
 Adafruit_MultiTrellis trellis((Adafruit_NeoTrellis*)t_array, Y_DIM / 4, X_DIM / 4);
 
 #define D_FLASH "/M4SEQ32"
-#define t_size Y_DIM* X_DIM
+#define t_size Y_DIM * X_DIM
 #define t_length t_size - 1
-#define maincolor seesaw_NeoPixel::Color(0, 0, 5)
-#define RED seesaw_NeoPixel::Color(155, 10, 10)
-#define R40 seesaw_NeoPixel::Color(20, 5, 5)
-#define R80 seesaw_NeoPixel::Color(90, 6, 6)
-#define R127 seesaw_NeoPixel::Color(200, 6, 6)
-#define ORANGE seesaw_NeoPixel::Color(155, 80, 10)
-#define O40 seesaw_NeoPixel::Color(20, 10, 2)
-#define O80 seesaw_NeoPixel::Color(90, 80, 10)
-#define O127 seesaw_NeoPixel::Color(200, 100, 10)
-#define YELLOW seesaw_NeoPixel::Color(155, 155, 30)
-#define Y40 seesaw_NeoPixel::Color(20, 20, 4)
-#define Y80 seesaw_NeoPixel::Color(90, 90, 25)
-#define Y127 seesaw_NeoPixel::Color(200, 200, 40)
-#define GREEN seesaw_NeoPixel::Color(0, 155, 0)
-#define G40 seesaw_NeoPixel::Color(0, 20, 0)
-#define G80 seesaw_NeoPixel::Color(0, 90, 0)
-#define G127 seesaw_NeoPixel::Color(0, 200, 0)
-#define CYAN seesaw_NeoPixel::Color(40, 155, 155)
-#define C40 seesaw_NeoPixel::Color(4, 20, 20)
-#define C80 seesaw_NeoPixel::Color(25, 90, 90)
-#define C127 seesaw_NeoPixel::Color(40, 200, 200)
-#define BLUE seesaw_NeoPixel::Color(20, 50, 155)
-#define B40 seesaw_NeoPixel::Color(2, 10, 20)
-#define B80 seesaw_NeoPixel::Color(10, 80, 90)
-#define B127 seesaw_NeoPixel::Color(10, 100, 200)
-#define PURPLE seesaw_NeoPixel::Color(100, 20, 155)
-#define P40 seesaw_NeoPixel::Color(13, 3, 20)
-#define P80 seesaw_NeoPixel::Color(60, 12, 90)
-#define P127 seesaw_NeoPixel::Color(130, 27, 200)
-#define PINK seesaw_NeoPixel::Color(155, 40, 60)
-#define PK40 seesaw_NeoPixel::Color(20, 5, 9)
-#define PK80 seesaw_NeoPixel::Color(90, 24, 36)
-#define PK127 seesaw_NeoPixel::Color(200, 53, 80)
-#define OFF seesaw_NeoPixel::Color(0, 0, 0)
-#define W100 seesaw_NeoPixel::Color(100, 100, 100)
-#define W75 seesaw_NeoPixel::Color(75, 75, 75)
-#define W10 seesaw_NeoPixel::Color(4, 4, 4)
+
+// Color defs for Trellis...
+#include "color_defs.h"
 
 const uint8_t numseqs = X_DIM;
 const uint8_t numsteps = t_size / 2;
 const uint8_t numpresets = X_DIM * 2;
 uint8_t length = t_size / 2;  // same as numsteps at boot!
+int lengths[numseqs];  // same as numsteps at boot!
+int offsets[numseqs] = {0};
+
+uint8_t brightness = 50;
 
 // Multitrack seq bits
+typedef enum {
+    TRIGATE = 0,
+    CC = 1,
+    NOTE = 2,
+    CHORD = 3,
+    ARP = 4
+} track_type;
+
 uint8_t track_notes[numseqs];  // C2 thru G2
 uint8_t ctrl_notes[3];
 uint8_t track_chan[numseqs];
 uint8_t ctrl_chan = 16;
+track_type modes[numseqs] = {TRIGATE};
 
 // Empty patterns...
-uint8_t seqs[numpresets][numseqs][numsteps];
+bool seqs[numpresets][numseqs][numsteps];
 uint8_t gates[numpresets][numseqs][numsteps];
 uint8_t vels[numpresets][numseqs][numsteps];
+uint8_t notes[numpresets][numseqs][numsteps];
 uint8_t probs[numpresets][numseqs][numsteps];
-uint8_t mutes[numseqs];
+bool mutes[numseqs];
 uint8_t presets[numpresets];
 
-uint8_t currstep = 0;
-uint8_t laststep = 0;
-uint8_t transpose = 0;
-uint8_t run = 0;
-uint8_t m4init = 0;
-uint8_t presetmode = 0;
-uint8_t chanedit = 0;
-uint8_t veledit = 0;
-uint8_t lenedit = 0;
-uint8_t probedit = 0;
-uint8_t noteedit = 0;
-uint8_t gateedit = 0;
-uint8_t swingedit = 0;
-uint8_t patedit = 1;
-uint8_t sel_track = 1;
-uint8_t lastsel = 1;
-int swing = 0;
+const uint16_t dacrange = 4095; // A0 & A1 = 12bit DAC on Feather M4 Express
+uint8_t currsteps[numseqs];
+uint8_t currstep;
+uint8_t laststeps[numseqs];
+uint8_t laststep;
+uint8_t transpose;
+uint8_t selstep;
+uint8_t swing;
+uint8_t sel_track;
+uint8_t lastsel;
+uint8_t noteedit; // (SHIFT)
+bool run;
+bool sure;
+bool write;
+bool m4init;
+bool presetmode;
+bool chanedit;
+bool veledit;
+bool offedit;
+bool lenedit;
+bool probedit;
+bool notesedit;
+bool gateedit;
+bool swingedit;
+bool patedit;
+bool hzv[2] = {0,0};
+const byte cvpins[2] = {14,15};
+const byte gatepins[numseqs] = {4,5,6,9,10,11,12,13};
 
 #include "Sequencer.h"
 #include "save_locations.h"
-#include "saved_patterns_json.h"
-#include "saved_velocities_json.h"
-#include "saved_probabilities_json.h"
-#include "saved_gates_json.h"
-#include "saved_settings_json.h"
 
 typedef struct {
   int step_size;
@@ -140,10 +129,6 @@ Config cfg = {
   .midi_forward_usb = true
 };
 
-const bool midi_out_debug = false;
-const bool midi_in_debug = false;
-const bool marci_debug = false;
-
 // end hardware definitions
 
 Adafruit_USBD_MIDI usb_midi;                                  // USB MIDI object
@@ -154,8 +139,6 @@ StepSequencer seqr;
 
 uint8_t midiclk_cnt = 0;
 uint32_t midiclk_last_micros = 0;
-
-#include "saveload.h"  /// FIXME:
 
 //
 // -- MIDI sending & receiving functions
@@ -174,6 +157,14 @@ void send_note_off(uint8_t note, uint8_t vel, uint8_t gate, bool on, uint8_t cha
     MIDIusb.sendNoteOff(note, vel, chan);
   }
   if (midi_out_debug) { Serial.printf("noteOff: %d %d %d %d\n", note, vel, gate, on); }
+}
+
+// callback used by Sequencer to send controlchange messages
+void send_cc(uint8_t cc, uint8_t val, bool on, uint8_t chan ) {
+  if (on) {
+    MIDIusb.sendControlChange(cc, val, chan);
+  }
+  if (midi_out_debug) { Serial.printf("controlChange: %d %d %d %d\n", cc, val, on, chan); }
 }
 
 // callback used by Sequencer to send midi clock when internally triggered
@@ -204,7 +195,7 @@ void handle_midi_in_clock() {
   uint32_t now_micros = micros();
   // once every ticks_per_step, play note (24 ticks per quarter note => 6 ticks per 16th note)
   if (midiclk_cnt % seqr.ticks_per_step == 0) {  // ticks_per_step = 6 for 16th note
-    seqr.trigger_ext(now_micros);                // FIXME: figure out 2nd arg (was step_millis)
+    seqr.trigger_ext(now_micros);
   }
   midiclk_cnt++;
   // once every quarter note, calculate new BPM, but be a little cautious about it
@@ -215,6 +206,87 @@ void handle_midi_in_clock() {
     }
     midiclk_last_micros = now_micros;
     midiclk_cnt = 0;
+  }
+}
+
+void handle_midi_in_NoteOff(uint8_t channel, uint8_t note, uint8_t vel) {
+  Serial.println("Note Stop");
+  switch (modes[sel_track - 1]){
+    case TRIGATE:
+      MIDIusb.sendNoteOff(track_notes[sel_track - 1], vel, track_chan[sel_track - 1]);
+      break;
+    case NOTE:
+      MIDIusb.sendNoteOff(note, vel, track_chan[sel_track - 1]);
+      break;
+    default: break;
+  } 
+}
+
+void handle_midi_in_NoteOn(uint8_t channel, uint8_t note, uint8_t vel) {
+  Serial.println("Note Start");
+  if (modes[sel_track - 1] == CC && veledit == 1) {
+    switch (noteedit){
+      case 0:
+        vels[presets[sel_track - 1]][sel_track - 1][selstep] = note;
+        seqs[presets[sel_track - 1]][sel_track - 1][selstep] = 1;
+        break;
+      case 1:
+        // LIVE ENTRY
+        vels[presets[sel_track - 1]][sel_track - 1][currstep] = note;
+        seqs[presets[sel_track - 1]][sel_track - 1][currstep] = 1;
+        break;
+      default: break;
+    }
+  } else if (modes[sel_track - 1] == NOTE && veledit == 1) {
+    switch (noteedit){
+      case 0:
+        send_note_off(notes[presets[sel_track - 1]][sel_track - 1][selstep],0,0,1,track_chan[sel_track - 1]);
+        notes[presets[sel_track - 1]][sel_track - 1][selstep] = note;
+        vels[presets[sel_track - 1]][sel_track - 1][selstep] = vel;
+        seqs[presets[sel_track - 1]][sel_track - 1][selstep] = 1;
+        break;
+      case 1:
+        // LIVE ENTRY
+        send_note_off(notes[presets[sel_track - 1]][sel_track - 1][currstep],0,0,1,track_chan[sel_track - 1]);
+        notes[presets[sel_track - 1]][sel_track - 1][currstep] = note;
+        vels[presets[sel_track - 1]][sel_track - 1][currstep] = vel;
+        seqs[presets[sel_track - 1]][sel_track - 1][currstep] = 1;
+        MIDIusb.sendNoteOn(note, vel, track_chan[sel_track - 1]);
+        break;
+      default: break;
+    }
+  } else if (modes[sel_track - 1] == TRIGATE) {
+    switch (noteedit){
+      case 0:
+        vels[presets[sel_track - 1]][sel_track - 1][selstep] = note;
+        seqs[presets[sel_track - 1]][sel_track - 1][selstep] = 1;
+        break;
+      case 1:
+        // LIVE ENTRY
+        vels[presets[sel_track - 1]][sel_track - 1][currstep] = note;
+        seqs[presets[sel_track - 1]][sel_track - 1][currstep] = 1;
+        MIDIusb.sendNoteOn(track_notes[sel_track - 1], vel, track_chan[sel_track - 1]);
+        trellis.setPixelColor(currstep, W100);
+        break;
+      default: break;
+    }
+  }
+}
+
+void handle_midi_in_CC(uint8_t channel, uint8_t cc, uint8_t val) {
+  Serial.println("CC Incoming");
+  switch (modes[sel_track - 1]) {
+    case CC: 
+      vels[presets[sel_track - 1]][sel_track - 1][selstep] = val;
+      // LIVE ENTRY
+      //vels[presets[sel_track - 1]][sel_track - 1][currstep] = val;
+      break;
+    case NOTE:
+      notes[presets[sel_track - 1]][sel_track - 1][selstep] = val;
+      // LIVE ENTRY
+      //notes[presets[sel_track - 1]][sel_track - 1][currstep] = val;
+      break;
+    default: break;
   }
 }
 
@@ -244,6 +316,7 @@ void configure_sequencer() {
   seqr.on_func = send_note_on;
   seqr.off_func = send_note_off;
   seqr.clk_func = send_clock_start_stop;
+  seqr.cc_func = send_cc;
   seqr.send_clock = cfg.midi_send_clock;
   seqr.length = length;
   seqr.transpose = transpose;
@@ -263,14 +336,14 @@ uint32_t Wheel(byte WheelPos) {
 }
 
 void toggle_selected(uint8_t keyId) {
-  trellis.setPixelColor(keyId, seq_col(sel_track));
   trellis.setPixelColor(lastsel + (numsteps - 1), seq_dim(lastsel, 40));
+  trellis.setPixelColor(keyId, seq_col(sel_track));
 }
 
 void show_sequence(uint8_t seq) {
   patedit = 1;
   for (uint8_t i = 0; i < numsteps; ++i) {
-    trellis.setPixelColor(i, seqs[presets[seq - 1]][seq - 1][i] > 0 ? seq_col(sel_track) : W10);
+    trellis.setPixelColor(i, seqs[presets[seq - 1]][seq - 1][i] > 0 ? seq_col(sel_track) : 0);
   }
   if (run == 0) { trellis.show(); }
 }
@@ -304,9 +377,38 @@ void show_probabilities(uint8_t seq) {
 void show_accents(uint8_t seq) {
   veledit = 1;
   uint32_t col = 0;
+  if (modes[seq-1] == CC) {
+    for (uint8_t i = 0; i < numsteps; ++i) {
+      trellis.setPixelColor(i, Wheel(vels[presets[sel_track - 1]][seq - 1][i]));
+    }
+  } else {
+    for (uint8_t i = 0; i < numsteps; ++i) {
+      trellis.setPixelColor(i, seq_dim(seq, vels[presets[sel_track - 1]][seq - 1][i]));
+    }
+  }  
+  if (run == 0) { trellis.show(); }
+}
+
+void show_notes(uint8_t seq) {
+  notesedit = 1;
+  uint32_t col = 0;
+  if (modes[seq-1] == NOTE) {
+    for (uint8_t i = 0; i < numsteps; ++i) {
+      trellis.setPixelColor(i, Wheel(notes[presets[sel_track - 1]][seq - 1][i]));
+    }
+  } else {
+    for (uint8_t i = 0; i < numsteps; ++i) {
+      trellis.setPixelColor(i, seq_dim(seq, notes[presets[sel_track - 1]][seq - 1][i]));
+    }
+  }  
+  if (run == 0) { trellis.show(); }
+}
+
+void show_presets() {
   for (uint8_t i = 0; i < numsteps; ++i) {
-    trellis.setPixelColor(i, seq_dim(seq, vels[presets[sel_track - 1]][seq - 1][i]));
+    trellis.setPixelColor(i, i < (numsteps / 2) ? 0 : W10);
   }
+  trellis.setPixelColor(presets[sel_track - 1], W100);
   if (run == 0) { trellis.show(); }
 }
 
@@ -327,21 +429,184 @@ void transpose_led() {
   if (run == 0) { trellis.show(); }
 }
 
+void mode_leds(uint8_t track){
+  for (uint8_t i = X_DIM*3; i < numsteps; ++i) {
+    trellis.setPixelColor(i, 0);
+  }
+  switch (modes[track - 1]){
+    case TRIGATE:
+      trellis.setPixelColor(24, W100);
+      break;
+    case CC:
+      trellis.setPixelColor(25, W100);
+      if (track - 1 == 6 || track - 1 == 7){
+        if (hzv[(track - 1) -6] == 1) {
+          trellis.setPixelColor(31, seq_dim(track,100)); //hzv
+        } else {
+          trellis.setPixelColor(31, W100); //voct
+        };
+      }
+      break;
+    case NOTE:
+      trellis.setPixelColor(26, W100);
+      break;
+    case CHORD:
+      trellis.setPixelColor(27, W100);
+      break;
+    case ARP:
+      trellis.setPixelColor(28, W100);
+      break;
+    default: break;
+  }
+  if (run == 0) { trellis.show(); }
+}
+
+// Initialise Channel Config display...
 void init_chan_conf(uint8_t track) {
   for (uint8_t i = 0; i < numsteps; ++i) {
     trellis.setPixelColor(i, 0);
   }
   trellis.setPixelColor(track_chan[track - 1] - 1, seq_col(track));
+  switch (modes[track - 1]){
+    case TRIGATE:
+      trellis.setPixelColor(24, W100);
+      break;
+    case CC:
+      trellis.setPixelColor(25, W100);
+      if (track - 1 == 6 || track - 1 == 7){
+        if (hzv[(track - 1) - 6] == 1) {
+          trellis.setPixelColor(31, seq_dim(track,100)); //hzv
+        } else {
+          trellis.setPixelColor(31, W100); //voct
+        };
+      }
+      break;
+    case NOTE:
+      trellis.setPixelColor(26, W100);
+      break;
+    case CHORD:
+      trellis.setPixelColor(27, W100);
+      break;
+    case ARP:
+      trellis.setPixelColor(28, W100);
+      break;
+    default: break;
+  }
   if (run == 0) { trellis.show(); }
 }
 
-void show_presets() {
-  for (uint8_t i = 0; i < numsteps; ++i) {
-    trellis.setPixelColor(i, i < (numsteps / 2) ? 0 : W10);
+// Show "Are you sure, Y/N" display...
+void sure_pane(){
+  for (uint8_t i = 0; i < t_size; ++i) {
+    trellis.setPixelColor(i, i == 26 ? GREEN : i == 29 ? RED : 0);
   }
-  trellis.setPixelColor(presets[sel_track - 1], W100);
-  if (run == 0) { trellis.show(); }
+  sure = 1;
+  trellis.setPixelColor(60, R40);
+  trellis.show();
 }
+
+// Show via button color that we're writing to flash...
+void toggle_write() {
+  write = write == 0 ? 1 : 0;
+  trellis.setPixelColor(59, write == 0 ? R40 : R127);
+  trellis.show();
+}
+
+// Set Brightness of Neotrellis...
+void set_brightness() {
+  for (uint8_t x = 0; x < X_DIM; ++x) {
+    for (uint8_t y = 0; y < Y_DIM; ++y) {
+      t_array[y][x].pixels.setBrightness(brightness);
+    }
+  }
+  trellis.show();
+}
+
+// Initialise Neotrellis interactions and static control rows...
+void init_interface() {
+  if (m4init == 0) {
+    for (int y = 0; y < Y_DIM; y++) {
+      for (int x = 0; x < X_DIM; x++) {
+        trellis.activateKey(x, y, SEESAW_KEYPAD_EDGE_RISING, true);
+        //trellis.activateKey(x, y, SEESAW_KEYPAD_EDGE_FALLING, true);
+        trellis.registerCallback(x, y, onKey);
+      }
+    }
+    m4init = 1;
+  }
+  set_brightness();
+
+  //Seq 1 > 8
+  trellis.setPixelColor(32, sel_track == 1 ? seq_col(sel_track) : seq_dim(1, 40));
+  trellis.setPixelColor(33, sel_track == 2 ? seq_col(sel_track) : seq_dim(2, 40));
+  trellis.setPixelColor(34, sel_track == 3 ? seq_col(sel_track) : seq_dim(3, 40));
+  trellis.setPixelColor(35, sel_track == 4 ? seq_col(sel_track) : seq_dim(4, 40));
+  trellis.setPixelColor(36, sel_track == 5 ? seq_col(sel_track) : seq_dim(5, 40));
+  trellis.setPixelColor(37, sel_track == 6 ? seq_col(sel_track) : seq_dim(6, 40));
+  trellis.setPixelColor(38, sel_track == 7 ? seq_col(sel_track) : seq_dim(7, 40));
+  trellis.setPixelColor(39, sel_track == 8 ? seq_col(sel_track) : seq_dim(8, 40));
+  //Mutes
+  trellis.setPixelColor(40, mutes[0] == 1 ? R80 : G40);
+  trellis.setPixelColor(41, mutes[0] == 1 ? R80 : G40);
+  trellis.setPixelColor(42, mutes[0] == 1 ? R80 : G40);
+  trellis.setPixelColor(43, mutes[0] == 1 ? R80 : G40);
+  trellis.setPixelColor(44, mutes[0] == 1 ? R80 : G40);
+  trellis.setPixelColor(45, mutes[0] == 1 ? R80 : G40);
+  trellis.setPixelColor(46, mutes[0] == 1 ? R80 : G40);
+  trellis.setPixelColor(47, mutes[0] == 1 ? R80 : G40);
+  //Panes
+  trellis.setPixelColor(48, patedit == 1 ? R127 : R40);
+  trellis.setPixelColor(49, veledit == 1 ? Y127 : Y40);
+  trellis.setPixelColor(50, probedit == 1 ? P127 : P40);
+  trellis.setPixelColor(51, gateedit == 1 ? B127 : B40);
+  //Globals
+  trellis.setPixelColor(52, noteedit == 1 ? W100 : PK40);
+  if (chanedit == 0) {
+    switch (transpose) {
+      case 0:
+        trellis.setPixelColor(53, B40);
+        break;
+      case 12:
+        trellis.setPixelColor(53, B80);
+        break;
+      case 24:
+        trellis.setPixelColor(53, B127);
+        break;
+      default:
+        break;
+    }
+  } else {
+    trellis.setPixelColor(53, R127);
+  }
+  trellis.setPixelColor(54, G40);
+  switch (cfg.step_size) {
+    case SIXTEENTH_NOTE:
+      trellis.setPixelColor(55, O127);
+      break;
+    case QUARTER_NOTE:
+      trellis.setPixelColor(55, O40);
+      break;
+    case EIGHTH_NOTE:
+      trellis.setPixelColor(55, O80);
+      break;
+    default:
+      break;
+  }
+  trellis.setPixelColor(55, O127);
+  //Control Row
+  trellis.setPixelColor(56, GREEN);
+  trellis.setPixelColor(57, RED);
+  trellis.setPixelColor(58, ORANGE);
+  trellis.setPixelColor(59, B80);
+  trellis.setPixelColor(60, C40);
+  trellis.setPixelColor(61, YELLOW);
+  trellis.setPixelColor(62, RED);
+  trellis.setPixelColor(63, GREEN);
+
+  trellis.show();
+}
+
+#include "saveload.h"  /// FIXME:
 
 TrellisCallback onKey(keyEvent evt) {
   auto const now = millis();
@@ -350,7 +615,21 @@ TrellisCallback onKey(keyEvent evt) {
   switch (evt.bit.EDGE) {
     case SEESAW_KEYPAD_EDGE_RISING:
       uint32_t col;
-      if (presetmode == 1 && (keyId < numsteps || keyId > 39 && keyId < 56)) {
+      if (sure == 1) {
+        if (keyId == 26){
+            sure = 1;
+            trellis.setPixelColor(60, R127);
+            trellis.setPixelColor(29, 0);
+            pattern_reset();
+        } else if (keyId == 29) {
+          sure = 0;
+          noteedit = 0;
+          init_interface();
+          show_sequence(sel_track);
+        } else {
+          break;
+        }
+      } else if (presetmode == 1 && (keyId < numsteps || keyId > 39 && keyId < 56)) {
         if (keyId < (numpresets)) {
           for (uint8_t i = 0; i < numpresets; ++i) {
             trellis.setPixelColor(i, 0);
@@ -381,13 +660,52 @@ TrellisCallback onKey(keyEvent evt) {
             trellis.setPixelColor(i, 0);
           }
           trellis.setPixelColor(keyId, seq_col(sel_track));
+        } else {
+          switch(keyId){
+            case 24:
+              modes[sel_track-1] = TRIGATE;
+              break;
+            case 25:
+              modes[sel_track-1] = CC;
+              break;
+            case 26:
+              modes[sel_track-1] = NOTE;
+              break;
+            case 27:
+              modes[sel_track-1] = CHORD;
+              break;
+            case 28:
+              modes[sel_track-1] = ARP;
+              break;
+            case 31:
+              if (modes[sel_track-1] == CC && (sel_track-1 == 6 || sel_track - 1 == 7)){
+                hzv[(sel_track-1)-6] = hzv[(sel_track-1)-6] == 0 ? 1 : 0;
+              }
+              break;
+            default: break;
+          }
+          mode_leds(sel_track);
         }
+      } else if (chanedit == 1 && ((keyId > (numsteps-1) + X_DIM && keyId < (numsteps) + X_DIM + 12)||(keyId > (numsteps) + X_DIM + 13 && keyId < (t_size-2)))) {
+        // do nothin'
       } else if (lenedit == 1 && keyId < numsteps) {
-        length = keyId + 1;
-        lenedit = 0;
-        trellis.setPixelColor(keyId, C127);
-        trellis.setPixelColor(54, G40);
-        configure_sequencer();
+        if (keyId + 1 >= offsets[sel_track - 1]) {
+          lengths[sel_track - 1] = keyId + 1;
+          //length = keyId + 1;
+          lenedit = 0;
+          trellis.setPixelColor(keyId, C127);
+          trellis.setPixelColor(54, G40);
+          configure_sequencer();
+        }
+      } else if (offedit == 1 && keyId < numsteps) {
+        if (keyId + 1 <= lengths[sel_track - 1]){
+          offsets[sel_track - 1] = keyId + 1;
+          //length = keyId + 1;
+          offedit = 0;
+          trellis.setPixelColor(keyId, B127);
+          trellis.setPixelColor(54, B40);
+          configure_sequencer();
+        }
       } else if (gateedit == 1 && keyId < numsteps) {
         uint8_t trk_arr = sel_track - 1;
         uint8_t gateId = trk_arr;
@@ -405,157 +723,172 @@ TrellisCallback onKey(keyEvent evt) {
         col = probs[presets[trk_arr]][trk_arr][keyId] == 10 ? seq_col(sel_track) : Wheel(probs[presets[trk_arr]][trk_arr][keyId] * 10);
         trellis.setPixelColor(keyId, col);
         if (run == 0) { trellis.show(); }
+      } else if (notesedit == 1 & keyId < numsteps) {
+        uint8_t trk_arr = sel_track - 1;
+        if (modes[trk_arr] == CC || modes[trk_arr] == NOTE) {
+          uint8_t prev_selstep = selstep;
+          selstep = keyId;
+          trellis.setPixelColor(prev_selstep, Wheel(notes[presets[trk_arr]][trk_arr][prev_selstep]));
+          trellis.setPixelColor(selstep,W100);
+        }
       } else if (veledit == 1 & keyId < numsteps) {
         uint8_t trk_arr = sel_track - 1;
-        switch (sel_track) {
-          case 0:
-            break;
-          case 1:
-            switch (vels[presets[trk_arr]][trk_arr][keyId]) {
-              case 127:
-                trellis.setPixelColor(keyId, R40);
-                vels[presets[trk_arr]][trk_arr][keyId] = 40;
-                break;
-              case 80:
-                trellis.setPixelColor(keyId, R127);
-                vels[presets[trk_arr]][trk_arr][keyId] = 127;
-                break;
-              case 40:
-                trellis.setPixelColor(keyId, R80);
-                vels[presets[trk_arr]][trk_arr][keyId] = 80;
-                break;
-              default:
-                break;
-            }
-            break;
-          case 2:
-            switch (vels[presets[trk_arr]][trk_arr][keyId]) {
-              case 127:
-                trellis.setPixelColor(keyId, O40);
-                vels[presets[trk_arr]][trk_arr][keyId] = 40;
-                break;
-              case 80:
-                trellis.setPixelColor(keyId, O127);
-                vels[presets[trk_arr]][trk_arr][keyId] = 127;
-                break;
-              case 40:
-                trellis.setPixelColor(keyId, O80);
-                vels[presets[trk_arr]][trk_arr][keyId] = 80;
-                break;
-              default:
-                break;
-            }
-            break;
-          case 3:
-            switch (vels[presets[trk_arr]][trk_arr][keyId]) {
-              case 127:
-                trellis.setPixelColor(keyId, Y40);
-                vels[presets[trk_arr]][trk_arr][keyId] = 40;
-                break;
-              case 80:
-                trellis.setPixelColor(keyId, Y127);
-                vels[presets[trk_arr]][trk_arr][keyId] = 127;
-                break;
-              case 40:
-                trellis.setPixelColor(keyId, Y80);
-                vels[presets[trk_arr]][trk_arr][keyId] = 80;
-                break;
-              default:
-                break;
-            }
-            break;
-          case 4:
-            switch (vels[presets[trk_arr]][trk_arr][keyId]) {
-              case 127:
-                trellis.setPixelColor(keyId, G40);
-                vels[presets[trk_arr]][trk_arr][keyId] = 40;
-                break;
-              case 80:
-                trellis.setPixelColor(keyId, G127);
-                vels[presets[trk_arr]][trk_arr][keyId] = 127;
-                break;
-              case 40:
-                trellis.setPixelColor(keyId, G80);
-                vels[presets[trk_arr]][trk_arr][keyId] = 80;
-                break;
-              default:
-                break;
-            }
-            break;
-          case 5:
-            switch (vels[presets[trk_arr]][trk_arr][keyId]) {
-              case 127:
-                trellis.setPixelColor(keyId, C40);
-                vels[presets[trk_arr]][trk_arr][keyId] = 40;
-                break;
-              case 80:
-                trellis.setPixelColor(keyId, C127);
-                vels[presets[trk_arr]][trk_arr][keyId] = 127;
-                break;
-              case 40:
-                trellis.setPixelColor(keyId, C80);
-                vels[presets[trk_arr]][trk_arr][keyId] = 80;
-                break;
-              default:
-                break;
-            }
-            break;
-          case 6:
-            switch (vels[presets[trk_arr]][trk_arr][keyId]) {
-              case 127:
-                trellis.setPixelColor(keyId, B40);
-                vels[presets[trk_arr]][trk_arr][keyId] = 40;
-                break;
-              case 80:
-                trellis.setPixelColor(keyId, B127);
-                vels[presets[trk_arr]][trk_arr][keyId] = 127;
-                break;
-              case 40:
-                trellis.setPixelColor(keyId, B80);
-                vels[presets[trk_arr]][trk_arr][keyId] = 80;
-                break;
-              default:
-                break;
-            }
-            break;
-          case 7:
-            switch (vels[presets[trk_arr]][trk_arr][keyId]) {
-              case 127:
-                trellis.setPixelColor(keyId, P40);
-                vels[presets[trk_arr]][trk_arr][keyId] = 40;
-                break;
-              case 80:
-                trellis.setPixelColor(keyId, P127);
-                vels[presets[trk_arr]][trk_arr][keyId] = 127;
-                break;
-              case 40:
-                trellis.setPixelColor(keyId, P80);
-                vels[presets[trk_arr]][trk_arr][keyId] = 80;
-                break;
-              default:
-                break;
-            }
-            break;
-          case 8:
-            switch (vels[presets[trk_arr]][trk_arr][keyId]) {
-              case 127:
-                trellis.setPixelColor(keyId, PK40);
-                vels[presets[trk_arr]][trk_arr][keyId] = 40;
-                break;
-              case 80:
-                trellis.setPixelColor(keyId, PK127);
-                vels[presets[trk_arr]][trk_arr][keyId] = 127;
-                break;
-              case 40:
-                trellis.setPixelColor(keyId, PK80);
-                vels[presets[trk_arr]][trk_arr][keyId] = 80;
-                break;
-              default:
-                break;
-            }
-            break;
-          default:
-            break;
+        if (modes[trk_arr] == CC || modes[trk_arr] == NOTE) {
+          uint8_t prev_selstep = selstep;
+          selstep = keyId;
+          trellis.setPixelColor(prev_selstep, Wheel(vels[presets[trk_arr]][trk_arr][prev_selstep]));
+          trellis.setPixelColor(selstep,W100);
+        } else {
+          switch (sel_track) {
+            case 0:
+              break;
+            case 1:
+              switch (vels[presets[trk_arr]][trk_arr][keyId]) {
+                case 127:
+                  trellis.setPixelColor(keyId, R40);
+                  vels[presets[trk_arr]][trk_arr][keyId] = 40;
+                  break;
+                case 80:
+                  trellis.setPixelColor(keyId, R127);
+                  vels[presets[trk_arr]][trk_arr][keyId] = 127;
+                  break;
+                case 40:
+                  trellis.setPixelColor(keyId, R80);
+                  vels[presets[trk_arr]][trk_arr][keyId] = 80;
+                  break;
+                default:
+                  break;
+              }
+              break;
+            case 2:
+              switch (vels[presets[trk_arr]][trk_arr][keyId]) {
+                case 127:
+                  trellis.setPixelColor(keyId, O40);
+                  vels[presets[trk_arr]][trk_arr][keyId] = 40;
+                  break;
+                case 80:
+                  trellis.setPixelColor(keyId, O127);
+                  vels[presets[trk_arr]][trk_arr][keyId] = 127;
+                  break;
+                case 40:
+                  trellis.setPixelColor(keyId, O80);
+                  vels[presets[trk_arr]][trk_arr][keyId] = 80;
+                  break;
+                default:
+                  break;
+              }
+              break;
+            case 3:
+              switch (vels[presets[trk_arr]][trk_arr][keyId]) {
+                case 127:
+                  trellis.setPixelColor(keyId, Y40);
+                  vels[presets[trk_arr]][trk_arr][keyId] = 40;
+                  break;
+                case 80:
+                  trellis.setPixelColor(keyId, Y127);
+                  vels[presets[trk_arr]][trk_arr][keyId] = 127;
+                  break;
+                case 40:
+                  trellis.setPixelColor(keyId, Y80);
+                  vels[presets[trk_arr]][trk_arr][keyId] = 80;
+                  break;
+                default:
+                  break;
+              }
+              break;
+            case 4:
+              switch (vels[presets[trk_arr]][trk_arr][keyId]) {
+                case 127:
+                  trellis.setPixelColor(keyId, G40);
+                  vels[presets[trk_arr]][trk_arr][keyId] = 40;
+                  break;
+                case 80:
+                  trellis.setPixelColor(keyId, G127);
+                  vels[presets[trk_arr]][trk_arr][keyId] = 127;
+                  break;
+                case 40:
+                  trellis.setPixelColor(keyId, G80);
+                  vels[presets[trk_arr]][trk_arr][keyId] = 80;
+                  break;
+                default:
+                  break;
+              }
+              break;
+            case 5:
+              switch (vels[presets[trk_arr]][trk_arr][keyId]) {
+                case 127:
+                  trellis.setPixelColor(keyId, C40);
+                  vels[presets[trk_arr]][trk_arr][keyId] = 40;
+                  break;
+                case 80:
+                  trellis.setPixelColor(keyId, C127);
+                  vels[presets[trk_arr]][trk_arr][keyId] = 127;
+                  break;
+                case 40:
+                  trellis.setPixelColor(keyId, C80);
+                  vels[presets[trk_arr]][trk_arr][keyId] = 80;
+                  break;
+                default:
+                  break;
+              }
+              break;
+            case 6:
+              switch (vels[presets[trk_arr]][trk_arr][keyId]) {
+                case 127:
+                  trellis.setPixelColor(keyId, B40);
+                  vels[presets[trk_arr]][trk_arr][keyId] = 40;
+                  break;
+                case 80:
+                  trellis.setPixelColor(keyId, B127);
+                  vels[presets[trk_arr]][trk_arr][keyId] = 127;
+                  break;
+                case 40:
+                  trellis.setPixelColor(keyId, B80);
+                  vels[presets[trk_arr]][trk_arr][keyId] = 80;
+                  break;
+                default:
+                  break;
+              }
+              break;
+            case 7:
+              switch (vels[presets[trk_arr]][trk_arr][keyId]) {
+                case 127:
+                  trellis.setPixelColor(keyId, P40);
+                  vels[presets[trk_arr]][trk_arr][keyId] = 40;
+                  break;
+                case 80:
+                  trellis.setPixelColor(keyId, P127);
+                  vels[presets[trk_arr]][trk_arr][keyId] = 127;
+                  break;
+                case 40:
+                  trellis.setPixelColor(keyId, P80);
+                  vels[presets[trk_arr]][trk_arr][keyId] = 80;
+                  break;
+                default:
+                  break;
+              }
+              break;
+            case 8:
+              switch (vels[presets[trk_arr]][trk_arr][keyId]) {
+                case 127:
+                  trellis.setPixelColor(keyId, PK40);
+                  vels[presets[trk_arr]][trk_arr][keyId] = 40;
+                  break;
+                case 80:
+                  trellis.setPixelColor(keyId, PK127);
+                  vels[presets[trk_arr]][trk_arr][keyId] = 127;
+                  break;
+                case 40:
+                  trellis.setPixelColor(keyId, PK80);
+                  vels[presets[trk_arr]][trk_arr][keyId] = 80;
+                  break;
+                default:
+                  break;
+              }
+              break;
+            default:
+              break;
+          }
         }
       } else if (keyId < numsteps) {
         uint8_t trk_arr = sel_track - 1;
@@ -645,7 +978,7 @@ TrellisCallback onKey(keyEvent evt) {
               trellis.setPixelColor(40, R80);
             } else {
               mutes[0] = 0;
-              trellis.setPixelColor(40, G80);
+              trellis.setPixelColor(40, G40);
             }
             break;
           case 41:
@@ -654,7 +987,7 @@ TrellisCallback onKey(keyEvent evt) {
               trellis.setPixelColor(41, R80);
             } else {
               mutes[1] = 0;
-              trellis.setPixelColor(41, G80);
+              trellis.setPixelColor(41, G40);
             }
             break;
           case 42:
@@ -663,7 +996,7 @@ TrellisCallback onKey(keyEvent evt) {
               trellis.setPixelColor(42, R80);
             } else {
               mutes[2] = 0;
-              trellis.setPixelColor(42, G80);
+              trellis.setPixelColor(42, G40);
             }
             break;
           case 43:
@@ -672,7 +1005,7 @@ TrellisCallback onKey(keyEvent evt) {
               trellis.setPixelColor(43, R80);
             } else {
               mutes[3] = 0;
-              trellis.setPixelColor(43, G80);
+              trellis.setPixelColor(43, G40);
             }
             break;
           case 44:
@@ -681,7 +1014,7 @@ TrellisCallback onKey(keyEvent evt) {
               trellis.setPixelColor(44, R80);
             } else {
               mutes[4] = 0;
-              trellis.setPixelColor(44, G80);
+              trellis.setPixelColor(44, G40);
             }
             break;
           case 45:
@@ -690,7 +1023,7 @@ TrellisCallback onKey(keyEvent evt) {
               trellis.setPixelColor(45, R80);
             } else {
               mutes[5] = 0;
-              trellis.setPixelColor(45, G80);
+              trellis.setPixelColor(45, G40);
             }
             break;
           case 46:
@@ -699,7 +1032,7 @@ TrellisCallback onKey(keyEvent evt) {
               trellis.setPixelColor(46, R80);
             } else {
               mutes[6] = 0;
-              trellis.setPixelColor(46, G80);
+              trellis.setPixelColor(46, G40);
             }
             break;
           case 47:
@@ -708,7 +1041,7 @@ TrellisCallback onKey(keyEvent evt) {
               trellis.setPixelColor(47, R80);
             } else {
               mutes[7] = 0;
-              trellis.setPixelColor(47, G80);
+              trellis.setPixelColor(47, G40);
             }
             break;
           case 48:
@@ -766,9 +1099,13 @@ TrellisCallback onKey(keyEvent evt) {
           case 52:
             if (noteedit == 0) {
               noteedit = 1;
+              lenedit = 0;
+              trellis.setPixelColor(54, G40);
               trellis.setPixelColor(52, W100);
             } else {
               noteedit = 0;
+              lenedit = 0;
+              trellis.setPixelColor(54, G40);
               if (chanedit == 1) {
                 chanedit = 0;
                 patedit = 1;
@@ -846,12 +1183,24 @@ TrellisCallback onKey(keyEvent evt) {
             }
             break;
           case 54:
-            if (lenedit == 0) {
-              lenedit = 1;
-              trellis.setPixelColor(54, G127);
+            if (noteedit == 0) {
+              if (lenedit == 0) {
+                offedit = 0;
+                lenedit = 1;
+                trellis.setPixelColor(54, G127);
+              } else {
+                lenedit = 0;
+                trellis.setPixelColor(54, G40);
+              }
             } else {
-              lenedit = 0;
-              trellis.setPixelColor(54, G40);
+              if (offedit == 0) {
+                lenedit = 0;
+                offedit = 1;
+                trellis.setPixelColor(54, B127);
+              } else {
+                offedit = 0;
+                trellis.setPixelColor(54, B40);
+              }
             }
             break;
           case 55:
@@ -881,13 +1230,13 @@ TrellisCallback onKey(keyEvent evt) {
                 swingedit = 0;
                 switch (cfg.step_size) {
                   case SIXTEENTH_NOTE:
-                    trellis.setPixelColor(55, O40);
+                    trellis.setPixelColor(55, O127);
                     break;
                   case QUARTER_NOTE:
-                    trellis.setPixelColor(55, O80);
+                    trellis.setPixelColor(55, O40);
                     break;
                   case EIGHTH_NOTE:
-                    trellis.setPixelColor(55, O127);
+                    trellis.setPixelColor(55, O80);
                     break;
                   default:
                     break;
@@ -896,23 +1245,26 @@ TrellisCallback onKey(keyEvent evt) {
             }
             break;
           case 56:
-            seqr.toggle_play_stop();
+            if (chanedit == 0) {seqr.toggle_play_stop();}
             break;
           case 57:
-            seqr.stop();
+            if (chanedit == 0) {seqr.stop();}
             break;
           case 58:
-            seqr.reset();
+            if (chanedit == 0) {seqr.reset();}
             break;
           case 59:
-            trellis.setPixelColor(59,R127);
-            trellis.show();
-            sequences_write();
+            if (chanedit == 0) {
+              trellis.setPixelColor(59,R127);
+              sequences_write();
+            }
             break;
           case 60:
             if (noteedit == 1) {
-              pattern_reset();
-              show_sequence(1);
+              if (sure == 0) {
+                trellis.setPixelColor(60, R127);
+                sure_pane();
+              }
             } else {
               if (presetmode == 0) {
                 presetmode = 1;
@@ -930,7 +1282,11 @@ TrellisCallback onKey(keyEvent evt) {
               swing = 0;
             } else if (veledit == 1) {
               for (uint8_t i = 0; i < numsteps; ++i) {
-                vels[presets[sel_track - 1]][sel_track - 1][i] = 80;
+                vels[presets[sel_track - 1]][sel_track - 1][i] = 72;
+              }
+            } else if (notesedit == 1) {
+              for (uint8_t i = 0; i < numsteps; ++i) {
+                notes[presets[sel_track - 1]][sel_track - 1][i] = 0;
               }
             } else {
               if (cfg.midi_send_clock == true) {
@@ -944,7 +1300,11 @@ TrellisCallback onKey(keyEvent evt) {
             }
             break;
           case 62:
-            if (gateedit == 1 && swingedit == 0) {
+            if (chanedit == 1) {
+              brightness = brightness > 15 ? brightness-10 : 5;
+              init_interface();
+              init_chan_conf(sel_track);
+            } else if (gateedit == 1 && swingedit == 0) {
               for (uint8_t i = 0; i < 32; ++i) {
                 gates[presets[trk_arr]][trk_arr][i] = gates[presets[trk_arr]][trk_arr][i] - 1 > 1 ? gates[presets[trk_arr]][trk_arr][i] - 1 : 1;
                 if (run == 0) set_gate(sel_track - 1, i, seq_col(sel_track));
@@ -953,14 +1313,22 @@ TrellisCallback onKey(keyEvent evt) {
             } else if (noteedit == 1 && swingedit == 0) {
               track_notes[sel_track - 1] = track_notes[sel_track - 1] > 0 ? track_notes[sel_track - 1] - 1 : 127;
             } else if (noteedit == 1 && swingedit == 1) {
-              swing = swing > -30 ? swing - 1 : -30;
+              swing = swing > 0 ? swing - 1 : 0;
             } else if (probedit == 1) {
               for (uint8_t i = 0; i < numsteps; ++i) {
                 probs[presets[sel_track - 1]][sel_track - 1][i] = probs[presets[sel_track - 1]][sel_track - 1][i] > 1 ? probs[presets[sel_track - 1]][sel_track - 1][i] - 1 : 1;
               }
             } else if (veledit == 1) {
-              for (uint8_t i = 0; i < numsteps; ++i) {
-                vels[presets[sel_track - 1]][sel_track - 1][i] = vels[presets[sel_track - 1]][sel_track - 1][i] > 20 ? vels[presets[sel_track - 1]][sel_track - 1][i] - 10 : 10;
+              if (modes[sel_track - 1] == CC || modes[sel_track - 1] == NOTE) {
+                vels[presets[sel_track - 1]][sel_track - 1][selstep] = vels[presets[sel_track - 1]][sel_track - 1][selstep] > 5 ? vels[presets[sel_track - 1]][sel_track - 1][selstep] - 1 : 0;
+              } else {
+                for (uint8_t i = 0; i < numsteps; ++i) {
+                  vels[presets[sel_track - 1]][sel_track - 1][i] = vels[presets[sel_track - 1]][sel_track - 1][i] > 5 ? vels[presets[sel_track - 1]][sel_track - 1][i] - 5 : 0;
+                }
+              }
+            } else if (notesedit == 1) {
+              if (modes[sel_track - 1] == CC || modes[sel_track - 1] == NOTE) {
+                notes[presets[sel_track - 1]][sel_track - 1][selstep] = notes[presets[sel_track - 1]][sel_track - 1][selstep] > 0 ? notes[presets[sel_track - 1]][sel_track - 1][selstep] - 1 : 0;
               }
             } else {
               tempo = tempo - 1;
@@ -968,7 +1336,11 @@ TrellisCallback onKey(keyEvent evt) {
             }
             break;
           case 63:
-            if (gateedit == 1 && swingedit == 0) {
+            if (chanedit == 1) {
+              brightness = brightness < 117 ? brightness+10 : 127;
+              init_interface();
+              init_chan_conf(sel_track);
+            } else if (gateedit == 1 && swingedit == 0) {
               for (uint8_t i = 0; i < 32; ++i) {
                 gates[presets[trk_arr]][trk_arr][i] = gates[presets[trk_arr]][trk_arr][i] + 1 < 15 ? gates[presets[trk_arr]][trk_arr][i] + 1 : 15;
                 if (run == 0) set_gate(sel_track - 1, i, seq_col(sel_track));
@@ -983,8 +1355,16 @@ TrellisCallback onKey(keyEvent evt) {
                 probs[presets[sel_track - 1]][sel_track - 1][i] = probs[presets[sel_track - 1]][sel_track - 1][i] < 10 ? probs[presets[sel_track - 1]][sel_track - 1][i] + 1 : 10;
               }
             } else if (veledit == 1) {
-              for (uint8_t i = 0; i < numsteps; ++i) {
-                vels[presets[sel_track - 1]][sel_track - 1][i] = vels[presets[sel_track - 1]][sel_track - 1][i] < 117 ? vels[presets[sel_track - 1]][sel_track - 1][i] + 10 : 127;
+              if (modes[sel_track - 1] == CC || modes[sel_track - 1] == NOTE) {
+                vels[presets[sel_track - 1]][sel_track - 1][selstep] = vels[presets[sel_track - 1]][sel_track - 1][selstep] < 122 ? vels[presets[sel_track - 1]][sel_track - 1][selstep] + 1 : 127;
+              } else {
+                for (uint8_t i = 0; i < numsteps; ++i) {
+                  vels[presets[sel_track - 1]][sel_track - 1][i] = vels[presets[sel_track - 1]][sel_track - 1][i] < 122 ? vels[presets[sel_track - 1]][sel_track - 1][i] + 5 : 127;
+                }
+              }
+            } else if (notesedit == 1) {
+              if (modes[sel_track - 1] == CC || modes[sel_track - 1] == NOTE) {
+                notes[presets[sel_track - 1]][sel_track - 1][selstep] = notes[presets[sel_track - 1]][sel_track - 1][selstep] < 127 ? notes[presets[sel_track - 1]][sel_track - 1][selstep] + 1 : 127;
               }
             } else {
               tempo = tempo + 1;
@@ -1003,7 +1383,6 @@ TrellisCallback onKey(keyEvent evt) {
 }
 
 void init_flash() {
-  // Initialize flash library and check its chip ID.
   if (!flash.begin()) {
     Serial.println(F("Error, failed to initialize flash chip!"));
     while (1) {
@@ -1013,9 +1392,9 @@ void init_flash() {
   Serial.print(F("Flash chip JEDEC ID: 0x"));
   Serial.println(flash.getJEDECID(), HEX);
 
-  // First call begin to mount the filesystem.  Check that it returns true
-  // to make sure the filesystem was mounted.
   if (!fatfs.begin(&flash)) {
+
+    // I'm ASSUMING all Feather M4 Express come with CircuitPython preloaded, therefore flash should already be formatted, but someone correct me if I'm wrong!
     Serial.println(F("Error, failed to mount newly formatted filesystem!"));
     Serial.println(
       F("Was the flash chip formatted with the SdFat_format example?"));
@@ -1024,89 +1403,9 @@ void init_flash() {
     }
   }
   Serial.println(F("Mounted filesystem!"));
+
+  // Make sure required folder exists... if it doesn't, create it
   flash_store();
-}
-
-void init_interface() {
-  //Seq 1 > 8
-  trellis.setPixelColor(32, RED);
-  trellis.setPixelColor(33, O40);
-  trellis.setPixelColor(34, Y40);
-  trellis.setPixelColor(35, G40);
-  trellis.setPixelColor(36, C40);
-  trellis.setPixelColor(37, B40);
-  trellis.setPixelColor(38, P40);
-  trellis.setPixelColor(39, PK40);
-  //Mutes
-  trellis.setPixelColor(40, mutes[0] == 1 ? R80 : G40);
-  trellis.setPixelColor(41, mutes[0] == 1 ? R80 : G40);
-  trellis.setPixelColor(42, mutes[0] == 1 ? R80 : G40);
-  trellis.setPixelColor(43, mutes[0] == 1 ? R80 : G40);
-  trellis.setPixelColor(44, mutes[0] == 1 ? R80 : G40);
-  trellis.setPixelColor(45, mutes[0] == 1 ? R80 : G40);
-  trellis.setPixelColor(46, mutes[0] == 1 ? R80 : G40);
-  trellis.setPixelColor(47, mutes[0] == 1 ? R80 : G40);
-  //Panes
-  trellis.setPixelColor(48, patedit == 1 ? R127 : R40);
-  trellis.setPixelColor(49, veledit == 1 ? Y127 : Y40);
-  trellis.setPixelColor(50, probedit == 1 ? P127 : P40);
-  trellis.setPixelColor(51, gateedit == 1 ? B127 : B40);
-  //Globals
-  trellis.setPixelColor(52, PK40);
-  switch (transpose) {
-    case 0:
-      trellis.setPixelColor(53, B40);
-      break;
-    case 12:
-      trellis.setPixelColor(53, B80);
-      break;
-    case 24:
-      trellis.setPixelColor(53, B127);
-      break;
-    default:
-      break;
-  }
-  trellis.setPixelColor(54, G40);
-  switch (cfg.step_size) {
-    case SIXTEENTH_NOTE:
-      trellis.setPixelColor(55, O127);
-      break;
-    case QUARTER_NOTE:
-      trellis.setPixelColor(55, O40);
-      break;
-    case EIGHTH_NOTE:
-      trellis.setPixelColor(55, O80);
-      break;
-    default:
-      break;
-  }
-  trellis.setPixelColor(55, O127);
-  //Control Row
-  trellis.setPixelColor(56, GREEN);
-  trellis.setPixelColor(57, RED);
-  trellis.setPixelColor(58, ORANGE);
-  trellis.setPixelColor(59, B80);
-  trellis.setPixelColor(60, C40);
-  trellis.setPixelColor(61, YELLOW);
-  trellis.setPixelColor(62, RED);
-  trellis.setPixelColor(63, GREEN);
-
-  if (m4init == 0) {
-    for (int y = 0; y < Y_DIM; y++) {
-      for (int x = 0; x < X_DIM; x++) {
-        trellis.activateKey(x, y, SEESAW_KEYPAD_EDGE_RISING, true);
-        //trellis.activateKey(x, y, SEESAW_KEYPAD_EDGE_FALLING, true);
-        trellis.registerCallback(x, y, onKey);
-      }
-    }
-    for (int x = 0; x < X_DIM; x++) {
-      for (int y = 0; y < Y_DIM; y++) {
-        t_array[y][x].pixels.setBrightness(127);
-      }
-    }
-    m4init = 1;
-  }
-  trellis.show();
 }
 
 #ifdef __arm__
@@ -1134,14 +1433,24 @@ void setup() {
   TinyUSBDevice.setManufacturerDescriptor("aPatchworkBoy");
   TinyUSBDevice.setProductDescriptor("M4StepSeq");
 
-  MIDIusb.begin();
+  MIDIusb.setHandleNoteOn(handle_midi_in_NoteOn);
+  MIDIusb.setHandleNoteOff(handle_midi_in_NoteOff);
+  MIDIusb.setHandleControlChange(handle_midi_in_CC);
+
+  MIDIusb.begin(MIDI_CHANNEL_OMNI);
   MIDIusb.turnThruOff();  // turn off echo
 
+  for (uint8_t i = 0; i < sizeof(gatepins); ++i) {
+    pinMode(gatepins[i], OUTPUT); //digtal (gate) out
+  }
+  //analogWriteResolution(12); //analog to 12bit (0-4095)
+
   Serial.begin(115200);
-  delay(2000);
+  if (marci_debug) {delay(2000);}
   init_flash();
   Serial.println(freeMemory());
   sequences_read();
+  notes_read();
   velocities_read();
   probabilities_read();
   gates_read();
@@ -1151,10 +1460,18 @@ void setup() {
     Serial.println(F("failed to begin trellis"));
     while (1) delay(1);
   } else {
-    Serial.println(F("Init..."));
+    Serial.println(F("Trellis Init..."));
   }
 
   randomSeed(analogRead(0));  // for probability
+
+  for (uint8_t l = 0; l < numseqs ; l++){
+    lengths[l] = t_size/2;
+  }
+  
+  patedit = patedit == 0 ? 1 : patedit;
+  sel_track = sel_track == 0 ? 1 : sel_track;
+  lastsel = lastsel == 0 ? 1 : sel_track;
 
   init_interface();
   Serial.println(freeMemory());
