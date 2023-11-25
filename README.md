@@ -1,4 +1,4 @@
-# Neotrellis-Trigger-Sequencer
+# Neotrellis MIDI & Analogue CV/Gate Sequencer
 [![YouTube Demo Video](http://img.youtube.com/vi/L5sNkB95-T4/0.jpg)](http://www.youtube.com/watch?v=L5sNkB95-T4 "Demo Video")
 
 An 8 track 32 step MIDI (over USB) & Analog gate/trigger sequencer, with 2 tracks of Analog CV (control voltage) Output and MIDI Clock Generator (with swing) for Feather M4 Express / Neotrellis 8x8 featuring per-step per-track per-pattern note & velocity & probability & gatelength layers, performance mutes and per-track loop-length (both start and endpoint) control.
