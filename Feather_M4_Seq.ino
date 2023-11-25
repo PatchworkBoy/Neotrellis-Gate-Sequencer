@@ -483,6 +483,13 @@ void init_chan_conf(uint8_t track) {
       break;
     case NOTE:
       trellis.setPixelColor(26, W100);
+      if (track - 1 == 6 || track - 1 == 7){
+        if (hzv[(track - 1) - 6] == 1) {
+          trellis.setPixelColor(31, seq_dim(track,100)); //hzv
+        } else {
+          trellis.setPixelColor(31, W100); //voct
+        };
+      }
       break;
     case CHORD:
       trellis.setPixelColor(27, W100);
@@ -672,13 +679,13 @@ TrellisCallback onKey(keyEvent evt) {
               modes[sel_track-1] = NOTE;
               break;
             case 27:
-              modes[sel_track-1] = CHORD;
+              //modes[sel_track-1] = CHORD;
               break;
             case 28:
-              modes[sel_track-1] = ARP;
+              //modes[sel_track-1] = ARP;
               break;
             case 31:
-              if (modes[sel_track-1] == CC && (sel_track-1 == 6 || sel_track - 1 == 7)){
+              if ((modes[sel_track-1] == CC || modes[sel_track-1] == NOTE) && (sel_track-1 > 5)){
                 hzv[(sel_track-1)-6] = hzv[(sel_track-1)-6] == 0 ? 1 : 0;
               }
               break;
