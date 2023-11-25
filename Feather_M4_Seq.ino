@@ -449,6 +449,13 @@ void mode_leds(uint8_t track){
       break;
     case NOTE:
       trellis.setPixelColor(26, W100);
+      if (track - 1 == 6 || track - 1 == 7){
+        if (hzv[(track - 1) -6] == 1) {
+          trellis.setPixelColor(31, seq_dim(track,100)); //hzv
+        } else {
+          trellis.setPixelColor(31, W100); //voct
+        };
+      }
       break;
     case CHORD:
       trellis.setPixelColor(27, W100);
