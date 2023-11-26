@@ -7,6 +7,7 @@
  * - Adafruit SPIFlash -- https://github.com/adafruit/Adafruit_SPIFlash
  * - Adafruit_TinyUSB -- https://github.com/adafruit/Adafruit_TinyUSB_Arduino
  * - Adafruit Seesaw -- https://github.com/adafruit/Adafruit_Seesaw
+ * - Adafruit Neopixel -- https://github.com/adafruit/Adafruit_Neopixel
  * - MIDI -- https://github.com/FortySevenEffects/arduino_midi_library
  * - ArduinoJson -- https://arduinojson.org/
  *
@@ -187,7 +188,9 @@ void update_display() {
   }
   if (offsets[trk_arr] - 1 > 0) trellis.setPixelColor(offsets[trk_arr] - 1, trk_arr > 1 ? R127 : B127);
   if (lengths[trk_arr] < numsteps) trellis.setPixelColor(lengths[trk_arr] - 1, trk_arr != 4 ? C127 : G127);
-
+  for (uint8_t t = 0; t < numseqs; ++t){
+    if (t != trk_arr) trellis.setPixelColor(numsteps + t, seq_dim(t + 1, seqs[presets[t]][t][step8i[t]] > 0 ? 80 : 40 ));
+  }
   trellis.show();
   strip.show();
 }
@@ -206,10 +209,14 @@ void reset_display() {
   } else {
     hit = W10;
   }
+  for (uint8_t t = 0; t < numseqs; ++t){
+    trellis.setPixelColor(numsteps + t, seq_dim(t + 1, sel_track - 1 == t ? 127 : 40 ));
+  }
   trellis.setPixelColor(step8i[trk_arr], hit);
   strip.setPixelColor(0, seq_col(sel_track));
   strip.show();
   trellis.show();
+  show_sequence(sel_track);
 }
 
 #include "Sequencer.h"

@@ -243,21 +243,18 @@ public:
     off_func(ctrl_notes[0] + transpose, 127, 5, true, ctrl_chan);
     off_func(ctrl_notes[1] + transpose, 127, 5, true, ctrl_chan);
     off_func(ctrl_notes[2] + transpose, 127, 5, true, ctrl_chan);
-    show_sequence(sel_track);
   }
 
   void toggle_play_stop() {
     if (playing) {
-      reset_display();
-      stop();
       on_func(ctrl_notes[1] + transpose, 127, 5, true, ctrl_chan);
       on_func(ctrl_notes[2] + transpose, 127, 5, true, ctrl_chan);
+      stop();
     } else {
-      play();
       on_func(ctrl_notes[2] + transpose, 127, 5, true, ctrl_chan);
       on_func(ctrl_notes[0] + transpose, 127, 5, true, ctrl_chan);
+      play();
     }
-    ctrl_stop();
   }
 
   // signal to sequencer/MIDI core we want to start playing
@@ -285,7 +282,7 @@ public:
       run = 0;
       stepi = -1;
       for (uint8_t s = 0; s <= 7; s++) {
-        step8i[s] = -1;
+        step8i[s] = 0;
         divcounts[s] = 0;
       }
       if (send_clock && !extclk_micros) {
