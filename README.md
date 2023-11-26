@@ -7,7 +7,7 @@ An 8 track 32 step MIDI (over USB) & Analog note/modulation/gate/trigger sequenc
 3 octave CV (v/oct, switchable to 2 octave Hz/V) Output for track 7 & 8 on pins A0 & A1 when tracks in CC or NOTE Mode.
 Track 1-8 Gates always output on digital io pins D4/5/6/9/10/11/12/13 (sending a 0-3.2v trigger/gate).
 
-Analog CV/Gate outputs are NOT regulated or protected in any way. Whack a 1k resistor between pin and 3.5mm TRS socket tip. Analog output is merely proof of concept. There's something squonky going on with the Feather M4's DACs (when used with my Neutron and K2) where they cannot hold an output voltage for long unless retriggered. Keep Release of your gates short, else you'll here drift-down to 0v oddities.
+Analog CV/Gate outputs are NOT regulated or protected in any way. Whack a 1k resistor between pin and 3.5mm TRS socket tip. Analog output is  proof of concept. There's something squonky going on with the Feather M4's DACs (when used with my Neutron and K2) where they cannot hold an output voltage for long unless retriggered. Keep release of triggered gates short, else you'll hear drift-down to 0v oddities.
 
 
 Adapted from https://github.com/todbot/picostepseq/
