@@ -188,9 +188,6 @@ void update_display() {
   }
   if (offsets[trk_arr] - 1 > 0) trellis.setPixelColor(offsets[trk_arr] - 1, trk_arr > 1 ? R127 : B127);
   if (lengths[trk_arr] < numsteps) trellis.setPixelColor(lengths[trk_arr] - 1, trk_arr != 4 ? C127 : G127);
-  for (uint8_t t = 0; t < numseqs; ++t){
-    if (t != trk_arr) trellis.setPixelColor(numsteps + t, seq_dim(t + 1, seqs[presets[t]][t][step8i[t]] > 0 ? 80 : 40 ));
-  }
   trellis.show();
   strip.show();
 }
@@ -208,9 +205,6 @@ void reset_display() {
     hit = probs[presets[trk_arr]][trk_arr][step8i[trk_arr]] > 0 ? seq_col(sel_track) : W10;
   } else {
     hit = W10;
-  }
-  for (uint8_t t = 0; t < numseqs; ++t){
-    trellis.setPixelColor(numsteps + t, seq_dim(t + 1, sel_track - 1 == t ? 127 : 40 ));
   }
   trellis.setPixelColor(step8i[trk_arr], hit);
   strip.setPixelColor(0, seq_col(sel_track));
@@ -496,7 +490,7 @@ void show_presets() {
     trellis.setPixelColor(i, i < (numsteps / 2) ? 0 : W10);
   }
   trellis.setPixelColor(presets[sel_track - 1], W100);
-  if (run == 0) { trellis.show(); }
+  trellis.show();
 }
 
 void show_divisions() {
@@ -792,6 +786,7 @@ TrellisCallback onKey(keyEvent evt) {
             trellis.setPixelColor(keyId, G80);
           }
         }
+        show_presets();
       } else if (chanedit == 1 && keyId < numsteps) { // CHANNEL STEP EDIT
         if (keyId < 16) {
           uint8_t chan = keyId + 1;
