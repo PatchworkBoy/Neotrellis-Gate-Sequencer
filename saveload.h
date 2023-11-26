@@ -9,7 +9,7 @@ void notes_write() {
   Serial.println(F("notes_write"));
   last_sequence_write_millis = millis();
 
-  for (uint8_t p = 0; p < numpresets; ++p){
+  for (uint8_t p = 0; p < numpresets; ++p) {
     Serial.println(p);
     DynamicJsonDocument doc(8192);  // assistant said 6144
     for (int j = 0; j < numseqs; j++) {
@@ -121,22 +121,22 @@ void settings_write() {
   set_array.add(tempo);
   set_array.add(cfg.step_size);
   set_array.add(transpose);
-  for (uint8_t i = 0; i < 8; ++i){
+  for (uint8_t i = 0; i < 8; ++i) {
     set_array.add(track_notes[i]);
   }
-  for (uint8_t i = 0; i < 3; ++i){
+  for (uint8_t i = 0; i < 3; ++i) {
     set_array.add(ctrl_notes[i]);
   }
-  for (uint8_t i = 0; i < 8; ++i){
+  for (uint8_t i = 0; i < 8; ++i) {
     set_array.add(track_chan[i]);
   }
   set_array.add(ctrl_chan);
   set_array.add(swing);
   set_array.add(brightness);
-  for (uint8_t i = 0; i < 8; ++i){
+  for (uint8_t i = 0; i < 8; ++i) {
     set_array.add(modes[i]);
   }
-  for (uint8_t i = 0; i < 2; ++i){
+  for (uint8_t i = 0; i < 2; ++i) {
     set_array.add(hzv[i]);
   }
   toggle_write();
@@ -161,7 +161,7 @@ void velocities_write() {
   Serial.println(F("velocities_write"));
   last_sequence_write_millis = millis();
 
-  for (uint8_t p = 0; p < numpresets; ++p){
+  for (uint8_t p = 0; p < numpresets; ++p) {
     Serial.println(p);
     DynamicJsonDocument doc(8192);  // assistant said 6144
     for (int j = 0; j < numseqs; j++) {
@@ -198,10 +198,10 @@ void sequences_write() {
     return;
   }
   last_sequence_write_millis = millis();
-  trellis.setPixelColor(59,R127);
+  trellis.setPixelColor(59, R127);
   trellis.show();
   Serial.println(F("sequences_write"));
-  for (uint8_t p = 0; p < numpresets; ++p){
+  for (uint8_t p = 0; p < numpresets; ++p) {
     Serial.println(p);
     DynamicJsonDocument doc(8192);  // assistant said 6144
     for (int j = 0; j < numseqs; j++) {
@@ -234,9 +234,9 @@ void sequences_write() {
 }
 
 void pattern_reset() {
-  trellis.setPixelColor(59,R127);
+  trellis.setPixelColor(59, R127);
   Serial.println(F("pat_bank_resets"));
-  for (uint8_t p = 0; p < numpresets; ++p){
+  for (uint8_t p = 0; p < numpresets; ++p) {
     Serial.println(p);
     DynamicJsonDocument doc(8192);  // assistant said 6144
     DeserializationError error = deserializeJson(doc, patterns[p]);
@@ -254,7 +254,7 @@ void pattern_reset() {
     }
   }
   Serial.println(F("vel_bank_resets"));
-  for (uint8_t p = 0; p < numpresets; ++p){
+  for (uint8_t p = 0; p < numpresets; ++p) {
     DynamicJsonDocument doc2(8192);  // assistant said 6144
     DeserializationError error2 = deserializeJson(doc2, velocities[p]);
     if (error2) {
@@ -271,7 +271,7 @@ void pattern_reset() {
     }
   }
   Serial.println(F("note_bank_resets"));
-  for (uint8_t p = 0; p < numpresets; ++p){
+  for (uint8_t p = 0; p < numpresets; ++p) {
     DynamicJsonDocument docn(8192);  // assistant said 6144
     DeserializationError errorn = deserializeJson(docn, notebanks[p]);
     if (errorn) {
@@ -300,32 +300,32 @@ void pattern_reset() {
   cfg.step_size = set_array[1];
   transpose = set_array[2];
   uint8_t z = 3;
-  for (uint8_t i = 0; i < 8; ++i){
+  for (uint8_t i = 0; i < 8; ++i) {
     track_notes[i] = set_array[z];
     z++;
   }
-  for (uint8_t i = 0; i < 3; ++i){
+  for (uint8_t i = 0; i < 3; ++i) {
     ctrl_notes[i] = set_array[z];
     z++;
   }
-  for (uint8_t i = 0; i < 8; ++i){
+  for (uint8_t i = 0; i < 8; ++i) {
     track_chan[i] = set_array[z];
     z++;
   }
   ctrl_chan = set_array[z];
-  swing = set_array[z+1];
-  brightness = set_array[z+2];
+  swing = set_array[z + 1];
+  brightness = set_array[z + 2];
   z = z + 3;
-  for (uint8_t i = 0; i < 8; ++i){
+  for (uint8_t i = 0; i < 8; ++i) {
     modes[i] = set_array[z] > 0 ? set_array[z] : TRIGATE;
     z++;
   }
-  for (uint8_t i = 0; i < 2; ++i){
+  for (uint8_t i = 0; i < 2; ++i) {
     hzv[i] = set_array[z];
     z++;
   }
   Serial.println(F("prob_bank_resets"));
-  for (uint8_t p = 0; p < numpresets; ++p){
+  for (uint8_t p = 0; p < numpresets; ++p) {
     DynamicJsonDocument doc4(8192);  // assistant said 6144
     DeserializationError error4 = deserializeJson(doc4, probabilities[p]);
     if (error4) {
@@ -342,7 +342,7 @@ void pattern_reset() {
     }
   }
   Serial.println(F("gate_banks_reset"));
-  for (uint8_t p = 0; p < numpresets; ++p){
+  for (uint8_t p = 0; p < numpresets; ++p) {
     DynamicJsonDocument doc5(8192);  // assistant said 6144
     DeserializationError error5 = deserializeJson(doc5, gatebanks[p]);
     if (error5) {
@@ -365,7 +365,7 @@ void pattern_reset() {
 // read all sequences from "disk"
 void sequences_read() {
   Serial.println(F("sequences_read"));
-  for (uint8_t p = 0; p < numpresets; ++p){
+  for (uint8_t p = 0; p < numpresets; ++p) {
     DynamicJsonDocument doc(8192);  // assistant said 6144
 
     File32 pfile = fatfs.open(pfiles[p], FILE_READ);
@@ -387,7 +387,7 @@ void sequences_read() {
         return;
       }
     }
-    
+
     for (int j = 0; j < numseqs; j++) {
       JsonArray seq_array = doc[j];
       for (int i = 0; i < numsteps; i++) {
@@ -405,7 +405,7 @@ void sequences_read() {
 // read all velocities from "disk"
 void velocities_read() {
   Serial.println(F("velocities_read"));
-  for (uint8_t p = 0; p < numpresets; ++p){
+  for (uint8_t p = 0; p < numpresets; ++p) {
     DynamicJsonDocument doc(8192);  // assistant said 6144
 
     File32 file = fatfs.open(vfiles[p], FILE_READ);
@@ -425,7 +425,7 @@ void velocities_read() {
         return;
       }
     }
-    
+
     for (int j = 0; j < numseqs; j++) {
       JsonArray vel_array = doc[j];
       for (int i = 0; i < numsteps; i++) {
@@ -442,7 +442,7 @@ void velocities_read() {
 // read all velocities from "disk"
 void notes_read() {
   Serial.println(F("notes_read"));
-  for (uint8_t p = 0; p < numpresets; ++p){
+  for (uint8_t p = 0; p < numpresets; ++p) {
     DynamicJsonDocument doc(8192);  // assistant said 6144
 
     File32 file = fatfs.open(nfiles[p], FILE_READ);
@@ -462,7 +462,7 @@ void notes_read() {
         return;
       }
     }
-    
+
     for (int j = 0; j < numseqs; j++) {
       JsonArray note_array = doc[j];
       for (int i = 0; i < numsteps; i++) {
@@ -479,7 +479,7 @@ void notes_read() {
 // read all probabilities from "disk"
 void probabilities_read() {
   Serial.println(F("probabilities_read"));
-  for (uint8_t p = 0; p < numpresets; ++p){
+  for (uint8_t p = 0; p < numpresets; ++p) {
     DynamicJsonDocument doc(8192);  // assistant said 6144
 
     File32 file = fatfs.open(prbfiles[p], FILE_READ);
@@ -501,7 +501,7 @@ void probabilities_read() {
         return;
       }
     }
-    
+
     for (int j = 0; j < numseqs; j++) {
       JsonArray prob_array = doc[j];
       for (int i = 0; i < numsteps; i++) {
@@ -518,7 +518,7 @@ void probabilities_read() {
 // read all gates from "disk"
 void gates_read() {
   Serial.println(F("gates_read"));
-  for (uint8_t p = 0; p < numpresets; ++p){
+  for (uint8_t p = 0; p < numpresets; ++p) {
     DynamicJsonDocument doc(8192);  // assistant said 6144
 
     File32 file = fatfs.open(gfiles[p], FILE_READ);
@@ -540,7 +540,7 @@ void gates_read() {
         return;
       }
     }
-    
+
     for (int j = 0; j < numseqs; j++) {
       JsonArray gate_array = doc[j];
       for (int i = 0; i < numsteps; i++) {
@@ -581,27 +581,27 @@ void settings_read() {
   cfg.step_size = set_array[1];
   transpose = set_array[2];
   uint8_t z = 3;
-  for (uint8_t i = 0; i < 8; ++i){
+  for (uint8_t i = 0; i < 8; ++i) {
     track_notes[i] = set_array[z];
     z++;
   }
-  for (uint8_t i = 0; i < 3; ++i){
+  for (uint8_t i = 0; i < 3; ++i) {
     ctrl_notes[i] = set_array[z];
     z++;
   }
-  for (uint8_t i = 0; i < 8; ++i){
+  for (uint8_t i = 0; i < 8; ++i) {
     track_chan[i] = set_array[z];
     z++;
   }
-  ctrl_chan = set_array[z] > 0 ? set_array[z] : ctrl_chan ;
-  swing = set_array[z+1] > 0 ? set_array[z+1] : swing;
-  brightness = set_array[z+2] > 0 ? set_array[z+2] : brightness;
+  ctrl_chan = set_array[z] > 0 ? set_array[z] : ctrl_chan;
+  swing = set_array[z + 1] > 0 ? set_array[z + 1] : swing;
+  brightness = set_array[z + 2] > 0 ? set_array[z + 2] : brightness;
   z = z + 3;
-  for (uint8_t i = 0; i < 8; ++i){
+  for (uint8_t i = 0; i < 8; ++i) {
     modes[i] = set_array[z] > 0 ? set_array[z] : TRIGATE;
     z++;
   }
-  for (uint8_t i = 0; i < 2; ++i){
+  for (uint8_t i = 0; i < 2; ++i) {
     hzv[i] = set_array[z];
     z++;
   }
@@ -612,7 +612,7 @@ void settings_read() {
 
 // General Storage bits...
 // List flash content
-void flash_store(){
+void flash_store() {
   if (!fatfs.exists(D_FLASH)) {
     Serial.println(F("" D_FLASH " directory not found, creating..."));
 

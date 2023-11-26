@@ -34,4 +34,88 @@
 #define OFF seesaw_NeoPixel::Color(0, 0, 0)
 #define W100 seesaw_NeoPixel::Color(100, 100, 100)
 #define W75 seesaw_NeoPixel::Color(75, 75, 75)
+#define W40 seesaw_NeoPixel::Color(40, 40, 40)
 #define W10 seesaw_NeoPixel::Color(4, 4, 4)
+
+uint32_t seq_col(int seq) {
+  switch (seq) {
+    case 1:
+      return RED;
+    case 2:
+      return ORANGE;
+    case 3:
+      return YELLOW;
+    case 4:
+      return GREEN;
+    case 5:
+      return CYAN;
+    case 6:
+      return BLUE;
+    case 7:
+      return PURPLE;
+    case 8:
+      return PINK;
+    default:
+      return 0;
+  }
+}
+
+uint32_t seq_dim(uint8_t seq, uint8_t level) {
+  switch (seq) {
+    case 1:
+      return (level <= 20) ? W10 : (level <= 40)  ? R40
+                                 : (level <= 80)  ? R80
+                                 : (level <= 127) ? R127
+                                                  : 0;
+    case 2:
+      return (level <= 20) ? W10 : (level <= 40)  ? O40
+                                 : (level <= 80)  ? O80
+                                 : (level <= 127) ? O127
+                                                  : 0;
+    case 3:
+      return (level <= 20) ? W10 : (level <= 40)  ? Y40
+                                 : (level <= 80)  ? Y80
+                                 : (level <= 127) ? Y127
+                                                  : 0;
+    case 4:
+      return (level <= 20) ? W10 : (level <= 40)  ? G40
+                                 : (level <= 80)  ? G80
+                                 : (level <= 127) ? G127
+                                                  : 0;
+    case 5:
+      return (level <= 20) ? W10 : (level <= 40)  ? C40
+                                 : (level <= 80)  ? C80
+                                 : (level <= 127) ? C127
+                                                  : 0;
+    case 6:
+      return (level <= 20) ? W10 : (level <= 40)  ? B40
+                                 : (level <= 80)  ? B80
+                                 : (level <= 127) ? B127
+                                                  : 0;
+    case 7:
+      return (level <= 20) ? W10 : (level <= 40)  ? P40
+                                 : (level <= 80)  ? P80
+                                 : (level <= 127) ? P127
+                                                  : 0;
+    case 8:
+      return (level <= 20) ? W10 : (level <= 40)  ? PK40
+                                 : (level <= 80)  ? PK80
+                                 : (level <= 127) ? PK127
+                                                  : 0;
+    default:
+      return 0;
+  }
+}
+
+uint32_t Wheel(byte WheelPos) {
+  if (WheelPos < 85) {
+    return seesaw_NeoPixel::Color(WheelPos * 3, 255 - WheelPos * 3, 0);
+  } else if (WheelPos < 170) {
+    WheelPos -= 85;
+    return seesaw_NeoPixel::Color(255 - WheelPos * 3, 0, WheelPos * 3);
+  } else {
+    WheelPos -= 170;
+    return seesaw_NeoPixel::Color(0, WheelPos * 3, 255 - WheelPos * 3);
+  }
+  return 0;
+}

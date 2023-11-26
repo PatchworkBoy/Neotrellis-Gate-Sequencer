@@ -1,7 +1,7 @@
 # Neotrellis MIDI & Analogue CV/Gate Sequencer
 [![YouTube Demo Video](http://img.youtube.com/vi/L5sNkB95-T4/0.jpg)](http://www.youtube.com/watch?v=L5sNkB95-T4 "Demo Video")
 
-An 8 track 32 step MIDI (over USB) & Analog note/modulation/gate/trigger sequencer, with 2 tracks of Analog CV (control voltage) Output and MIDI Clock Generator (with swing) for Feather M4 Express / Neotrellis 8x8, featuring per-step per-track per-pattern note & velocity & probability & gatelength layers, performance mutes and per-track loop-length (both start and endpoint) control.
+An 8 track 32 step MIDI (over USB) & Analog note/modulation/gate/trigger sequencer, with 2 tracks of Analog CV (control voltage) Output and MIDI Clock Generator (with swing) for Feather M4 Express / Neotrellis 8x8, featuring per-step per-track per-pattern note & velocity & probability & gatelength & clock division layers, performance mutes and per-track loop-length (both start and endpoint) control.
 16 storable preset patterns per track (all layers stored). Customisable note-per-track (Trigger/Gate mode) and channel-per-track.
 
 3 octave CV (v/oct, switchable to 2 octave Hz/V) Output for track 7 & 8 on pins A0 & A1 when tracks in CC or NOTE Mode.
@@ -23,7 +23,7 @@ NeoTrellis Surface...
 - Row 1 - 4: Steps 1 thru 32 (pattern edit: on/off, velocity edit: cycle thru velocity 40 / 80 / 127, Length: select end step, Probability: 10% - 100% in 10% increments)
 - Row 5: Track Select - Trk1 | Trk2 | Trk3 | Trk4 | Trk5 | Trk6 | Trk7 | Trk8
 - Row 6: Track Mutes - Trk1 | Trk2 | Trk3 | Trk4 | Trk5 | Trk6 | Trk7 | Trk8
-- Row 7: Pattern Edit | Velocity Edit | Probability Edit | Gate Length Edit | SHIFT (^) | Global Octave 0/+1/+2 (only while stopped) / ^ Channel Config (only while stopped) | Loop-End / ^ Loop-Start | toggle step size - quarter / eighth / sixteenth / ^swing
+- Row 7: Pattern Edit | Velocity Edit | Probability Edit | Gate Length Edit | SHIFT (^) | Global Octave 0/+1/+2 (only while stopped) / ^ Channel Config (stopped) ? ^ Pattern Clock Division (running) | Loop-End / ^ Loop-Start | toggle step size - quarter / eighth / sixteenth / ^swing
 - Row 8: Toggle Play/Stop | Stop | Reset | SAVE | PRESETS / ^Factory Reset | MIDICLOCK Send On/Off | param - | param +
 
 PARAM -/+
