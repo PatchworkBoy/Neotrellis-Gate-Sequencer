@@ -8,7 +8,7 @@ One track can be assigned as an arpeggiator for live arpeggiation of incoming MI
 3 octave CV (v/oct, switchable to 2 octave Hz/V) Output for track 7 & 8 on pins A0 & A1 when tracks in CC or NOTE.
 Track 1-8 Gates always output on digital io pins D4/5/6/9/10/11/12/13 (sending a 0-3.2v trigger/gate).
 
-Analog CV/Gate outputs are NOT regulated or protected in any way. Whack a 1k resistor between pin and 3.5mm TRS socket tip. Analog output is merely proof of concept. There's something squonky going on with the Feather M4's DACs (when used with my Neutron and K2) where they cannot hold an output voltage for long unless retriggered. Keep Release of your gates short, else you'll here drift-down to 0v oddities.
+Analog CV/Gate outputs are NOT regulated or protected in any way. Whack a 1k resistor between pin and 3.5mm TRS socket tip. Analog output is merely proof of concept. There's something squonky going on with the Feather M4's DACs (when used with my Neutron and K2) where they cannot hold an output voltage for long unless retriggered. Keep Release of your gates short, else you'll hear drift-down to 0v oddities.
 
 
 Adapted from https://github.com/todbot/picostepseq/
@@ -67,7 +67,8 @@ In CC or NOTE mode, Velocity pane allows step selection... and then:
  - held incoming midi notes (played live via external source) are arpeggiated in accordance with chosen pattern over chosen number of octaves.
  - the arp engine's notestack can hold a maximum of 10 notes (cos 8 fingers, 2 thumbs). Once full, oldest note shuffles off the pile to make way for newest note.
  - On Pattern Edit view, param +/- cycles thru number of octaves (1-4)
- ...with SHIFT toggled off...
+ 
+ In ARP mode with SHIFT toggled off...
  - On Pattern Edit view, param +/- cycles thru patterns (1-7)
 
  Arp Patterns:
