@@ -1,5 +1,5 @@
 /**
- * Feather M4 Seq -- An 8 track 32 step MIDI (& Analog) Gate (& CV) Sequencer for Feather M4 Express & Neotrellis 8x8
+ * Feather M4 Seq -- An 8 track 32 step MIDI (& Analog) Gate (& CV) Sequencer for Feather M4 Express & Neotrellis 8x8, with probability, looping, swing, velocity, arpeggiator and mutes
  * 04 Nov 2023 - @apatchworkboy / Marci
  * 28 Apr 2023 - original via @todbot / Tod Kurt https://github.com/todbot/picostepseq/
  *
@@ -27,105 +27,51 @@
 #include <MIDI.h>
 #include <ArduinoJson.h>
 #include "flash_config.h"
+#include <algorithm>
+#include <vector>
 
 // Serial Console logging...
 const bool midi_out_debug = false;
 const bool midi_in_debug = false;
 const bool marci_debug = false;
 
-Adafruit_NeoPixel strip = Adafruit_NeoPixel(2, 8, NEO_GRB + NEO_KHZ800);
-
-Adafruit_SPIFlash flash(&flashTransport);
-FatVolume fatfs;
-
-Adafruit_USBD_MIDI usb_midi;                                  // USB MIDI object
-MIDI_CREATE_INSTANCE(Adafruit_USBD_MIDI, usb_midi, MIDIusb);  // USB MIDI
-
 // HOW BIG IS YOUR TRELLIS?
 #define Y_DIM 8  //number of rows of key
 #define X_DIM 8  //number of columns of keys
 
+Adafruit_NeoPixel strip = Adafruit_NeoPixel(2, 8, NEO_GRB + NEO_KHZ800);
+Adafruit_SPIFlash flash(&flashTransport);
+Adafruit_USBD_MIDI usb_midi;                                  // USB MIDI object
 Adafruit_NeoTrellis t_array[Y_DIM / 4][X_DIM / 4] = {
   { Adafruit_NeoTrellis(0x30), Adafruit_NeoTrellis(0x2E) },
   { Adafruit_NeoTrellis(0x2F), Adafruit_NeoTrellis(0x31) }
 };
-
 Adafruit_MultiTrellis trellis((Adafruit_NeoTrellis*)t_array, Y_DIM / 4, X_DIM / 4);
 
+MIDI_CREATE_INSTANCE(Adafruit_USBD_MIDI, usb_midi, MIDIusb);  // USB MIDI
+FatVolume fatfs;
+
 #define D_FLASH "/M4SEQ32"
-#define t_size Y_DIM* X_DIM
+#define t_size Y_DIM * X_DIM
 #define t_length t_size - 1
 
 // Color defs for Trellis...
 #include "color_defs.h"
 
-const uint8_t numseqs = X_DIM;
+const uint8_t numtracks = X_DIM;
 const uint8_t numsteps = t_size / 2;
 const uint8_t numpresets = X_DIM * 2;
-uint8_t length = t_size / 2;  // same as numsteps at boot!
-int lengths[numseqs];         // same as numsteps at boot!
-int offsets[numseqs];
-
-uint8_t brightness = 50;
-
-// typedefs
-typedef enum {
-  TRIGATE = 0,
-  CC = 1,
-  NOTE = 2,
-  CHORD = 3,
-  ARP = 4,
-} track_type;
-
-typedef enum {
-  NONE,
-  START,
-  STOP,
-  CLOCK,
-} clock_type_t;
-
-typedef enum {
-  QUARTER_NOTE = 24,
-  EIGHTH_NOTE = 12,
-  SIXTEENTH_NOTE = 6,
-} valid_ticks_per_step;
-
-typedef struct {
-  int step_size;
-  bool midi_send_clock;
-  bool midi_forward_usb;
-} Config;
-
-uint8_t track_notes[numseqs];  // C2 thru G2
-uint8_t ctrl_notes[3];
-uint8_t track_chan[numseqs];
-uint8_t ctrl_chan = 16;
-track_type modes[numseqs] = { TRIGATE };
-
-// Empty patterns...
-bool mutes[numseqs];
-bool seqs[numpresets][numseqs][numsteps];
-int outcomes[numseqs];
-int step8i[numseqs];
-uint8_t divcounts[numseqs];
-uint8_t divs[numpresets][numseqs];
-uint8_t gates[numpresets][numseqs][numsteps];
-uint8_t notes[numpresets][numseqs][numsteps];
-uint8_t presets[numpresets];
-uint8_t probs[numpresets][numseqs][numsteps];
-uint8_t vels[numpresets][numseqs][numsteps];
-
 const uint16_t dacrange = 4095;  // A0 & A1 = 12bit DAC on Feather M4 Express
-uint8_t currsteps[numseqs];
-uint8_t laststeps[numseqs];
-uint8_t currstep;
-uint8_t lastsel;
-uint8_t laststep;
+const byte cvpins[2] = { 14, 15 };
+const byte gatepins[numtracks] = { 4, 5, 6, 9, 10, 11, 12, 13 };
+uint8_t length = t_size / 2;  // same as numsteps at boot!
+uint8_t brightness = 50;
 uint8_t sel_track;
+uint8_t lastsel;
 uint8_t selstep;
 uint8_t shifted;  // (SHIFT)
-uint8_t swing;
 uint8_t transpose;
+bool hzv[2] = { 0, 0 };
 bool chanedit;
 bool divedit;
 bool gateedit;
@@ -136,85 +82,25 @@ bool offedit;
 bool patedit;
 bool presetmode;
 bool probedit;
-bool pulse;
-bool run;
 bool sure;
 bool swingedit;
 bool veledit;
 bool write;
-bool hzv[2] = { 0, 0 };
-const byte cvpins[2] = { 14, 15 };
-const byte gatepins[numseqs] = { 4, 5, 6, 9, 10, 11, 12, 13 };
+bool resetflag;
 
-void update_display() {
-  if (presetmode == 1 || chanedit == 1 || sure == 1 || divedit == 1) {
-    return;
-  }
-  uint32_t color = 0;
-  uint32_t hit = 0;
-  uint8_t trk_arr = sel_track - 1;
-
-  //active step ticker
-  if (gateedit == 1) {
-    hit = gates[presets[trk_arr]][trk_arr][step8i[trk_arr]] > 0 ? PURPLE : W100;
-    color = gates[presets[trk_arr]][trk_arr][laststeps[trk_arr]] < 15 ? Wheel(gates[presets[trk_arr]][trk_arr][laststeps[trk_arr]] * 5) : seq_col(sel_track);
-  } else if (probedit == 1) {
-    hit = seqs[presets[trk_arr]][trk_arr][step8i[trk_arr]] > 0 ? PURPLE : W100;
-    color = probs[presets[trk_arr]][trk_arr][laststeps[trk_arr]] < 10 ? Wheel(probs[presets[trk_arr]][trk_arr][laststeps[trk_arr]] * 10) : seq_col(sel_track);
-  } else if (veledit == 1) {
-    hit = step8i[trk_arr] != selstep ? seqs[presets[trk_arr]][trk_arr][step8i[trk_arr]] > 0 ? PURPLE : W100 : W100;
-    if (modes[trk_arr] == CC || modes[trk_arr] == NOTE) {
-      color = Wheel(vels[presets[trk_arr]][trk_arr][laststeps[trk_arr]]);
-    } else {
-      color = seq_dim(sel_track, vels[presets[trk_arr]][trk_arr][laststeps[trk_arr]]);
-    }
-  } else if (notesedit == 1) {
-    hit = step8i[trk_arr] != selstep ? seqs[presets[trk_arr]][trk_arr][step8i[trk_arr]] > 0 ? PURPLE : W100 : W100;
-    if (modes[trk_arr] == CC || modes[trk_arr] == NOTE) {
-      color = Wheel(notes[presets[trk_arr]][trk_arr][laststeps[trk_arr]]);
-    } else {
-      color = seq_dim(sel_track, notes[presets[trk_arr]][trk_arr][laststeps[trk_arr]]);
-    }
-  } else {
-    hit = seqs[presets[trk_arr]][trk_arr][step8i[trk_arr]] > 0 ? PURPLE : W100;
-    color = seqs[presets[trk_arr]][trk_arr][laststeps[trk_arr]] > 0 ? seq_col(sel_track) : 0;
-  }
-  trellis.setPixelColor(step8i[trk_arr], hit);
-  strip.setPixelColor(0, seqs[presets[trk_arr]][trk_arr][step8i[trk_arr]] > 0 ? seq_col(sel_track) : (pulse == 1 ? W40 : 0));
-  if (modes[trk_arr] == CC && veledit == 1) {
-    trellis.setPixelColor(laststeps[trk_arr], laststeps[trk_arr] != selstep ? color : W100);
-  } else {
-    trellis.setPixelColor(laststeps[trk_arr], color);
-  }
-  if (offsets[trk_arr] - 1 > 0) trellis.setPixelColor(offsets[trk_arr] - 1, trk_arr > 1 ? R127 : B127);
-  if (lengths[trk_arr] < numsteps) trellis.setPixelColor(lengths[trk_arr] - 1, trk_arr != 4 ? C127 : G127);
-  trellis.show();
-  strip.show();
-}
-
-void reset_display() {
-  uint32_t hit = 0;
-  uint8_t trk_arr = sel_track - 1;
-  if (patedit == 1) {
-    hit = seqs[presets[trk_arr]][trk_arr][step8i[trk_arr]] > 0 ? seq_col(sel_track) : W10;
-  } else if (gateedit == 1) {
-    hit = gates[presets[trk_arr]][trk_arr][step8i[trk_arr]] > 0 ? seq_col(sel_track) : W10;
-  } else if (veledit == 1) {
-    hit = vels[presets[trk_arr]][trk_arr][step8i[trk_arr]] > 0 ? seq_col(sel_track) : W10;
-  } else if (probedit == 1) {
-    hit = probs[presets[trk_arr]][trk_arr][step8i[trk_arr]] > 0 ? seq_col(sel_track) : W10;
-  } else {
-    hit = W10;
-  }
-  trellis.setPixelColor(step8i[trk_arr], hit);
-  strip.setPixelColor(0, seq_col(sel_track));
-  strip.show();
-  trellis.show();
-  show_sequence(sel_track);
-}
+#include "arp.h"
+byte arppattern = 1;
+byte arpoctave = 1;
+Arp<10> arp;
 
 #include "Sequencer.h"
 #include "save_locations.h"
+
+typedef struct {
+  int step_size;
+  bool midi_send_clock;
+  bool midi_forward_usb;
+} Config;
 
 Config cfg = {
   .step_size = SIXTEENTH_NOTE,
@@ -222,11 +108,10 @@ Config cfg = {
   .midi_forward_usb = true
 };
 
-// end hardware definitions
-
 float tempo = 120;
 StepSequencer seqr;
 
+// end hardware definitions
 uint8_t midiclk_cnt = 0;
 uint32_t midiclk_last_micros = 0;
 
@@ -300,81 +185,112 @@ void handle_midi_in_clock() {
 }
 
 void handle_midi_in_NoteOff(uint8_t channel, uint8_t note, uint8_t vel) {
-  Serial.println("Note Stop");
-  switch (modes[sel_track - 1]) {
+  if (marci_debug)  Serial.println("Note Stop");
+  switch (seqr.modes[sel_track - 1]) {
     case TRIGATE:
-      MIDIusb.sendNoteOff(track_notes[sel_track - 1], vel, track_chan[sel_track - 1]);
+      MIDIusb.sendNoteOff(seqr.track_notes[sel_track - 1], vel, seqr.track_chan[sel_track - 1]);
       break;
     case NOTE:
-      MIDIusb.sendNoteOff(note, vel, track_chan[sel_track - 1]);
+      MIDIusb.sendNoteOff(note, vel, seqr.track_chan[sel_track - 1]);
+      break;
+    case ARP:
+      if (marci_debug) Serial.println("Firing NoteOff to arp for");
+      if (marci_debug) Serial.println(note);
+      arp.NoteOff(note);
       break;
     default: break;
   }
 }
 
 void handle_midi_in_NoteOn(uint8_t channel, uint8_t note, uint8_t vel) {
-  Serial.println("Note Start");
-  if (modes[sel_track - 1] == CC && veledit == 1) {
-    switch (shifted) {
-      case 0:
-        vels[presets[sel_track - 1]][sel_track - 1][selstep] = note;
-        seqs[presets[sel_track - 1]][sel_track - 1][selstep] = 1;
-        break;
-      case 1:
-        // LIVE ENTRY
-        vels[presets[sel_track - 1]][sel_track - 1][currstep] = note;
-        seqs[presets[sel_track - 1]][sel_track - 1][currstep] = 1;
-        break;
-      default: break;
-    }
-  } else if (modes[sel_track - 1] == NOTE && veledit == 1) {
-    switch (shifted) {
-      case 0:
-        send_note_off(notes[presets[sel_track - 1]][sel_track - 1][selstep], 0, 0, 1, track_chan[sel_track - 1]);
-        notes[presets[sel_track - 1]][sel_track - 1][selstep] = note;
-        vels[presets[sel_track - 1]][sel_track - 1][selstep] = vel;
-        seqs[presets[sel_track - 1]][sel_track - 1][selstep] = 1;
-        break;
-      case 1:
-        // LIVE ENTRY
-        send_note_off(notes[presets[sel_track - 1]][sel_track - 1][currstep], 0, 0, 1, track_chan[sel_track - 1]);
-        notes[presets[sel_track - 1]][sel_track - 1][currstep] = note;
-        vels[presets[sel_track - 1]][sel_track - 1][currstep] = vel;
-        seqs[presets[sel_track - 1]][sel_track - 1][currstep] = 1;
-        MIDIusb.sendNoteOn(note, vel, track_chan[sel_track - 1]);
-        break;
-      default: break;
-    }
-  } else if (modes[sel_track - 1] == TRIGATE) {
-    switch (shifted) {
-      case 0:
-        vels[presets[sel_track - 1]][sel_track - 1][selstep] = note;
-        seqs[presets[sel_track - 1]][sel_track - 1][selstep] = 1;
-        break;
-      case 1:
-        // LIVE ENTRY
-        vels[presets[sel_track - 1]][sel_track - 1][currstep] = note;
-        seqs[presets[sel_track - 1]][sel_track - 1][currstep] = 1;
-        MIDIusb.sendNoteOn(track_notes[sel_track - 1], vel, track_chan[sel_track - 1]);
-        trellis.setPixelColor(currstep, W100);
-        break;
-      default: break;
+  if (marci_debug) Serial.println("Note Start");
+  switch (seqr.modes[sel_track - 1]) {
+    case CC:
+      if (marci_debug) Serial.println("CC");
+      if (veledit == 1) {
+        switch (shifted) {
+          case 0:
+            seqr.vels[seqr.presets[sel_track - 1]][sel_track - 1][selstep] = note;
+            seqr.seqs[seqr.presets[sel_track - 1]][sel_track - 1][selstep] = 1;
+            break;
+          case 1:
+            // LIVE ENTRY
+            seqr.vels[seqr.presets[sel_track - 1]][sel_track - 1][seqr.multistepi[sel_track - 1]] = note;
+            seqr.seqs[seqr.presets[sel_track - 1]][sel_track - 1][seqr.multistepi[sel_track - 1]] = 1;
+            break;
+          default: break;
+        }
+      }
+      break;
+    case NOTE:
+      if (marci_debug) Serial.println("Note");
+      if (veledit == 1) {
+        switch (shifted) {
+          case 0:
+            send_note_off(seqr.notes[seqr.presets[sel_track - 1]][sel_track - 1][selstep], 0, 0, 1, seqr.track_chan[sel_track - 1]);
+            seqr.notes[seqr.presets[sel_track - 1]][sel_track - 1][selstep] = note;
+            seqr.vels[seqr.presets[sel_track - 1]][sel_track - 1][selstep] = vel;
+            seqr.seqs[seqr.presets[sel_track - 1]][sel_track - 1][selstep] = 1;
+            break;
+          case 1:
+            // LIVE ENTRY
+            send_note_off(seqr.notes[seqr.presets[sel_track - 1]][sel_track - 1][seqr.multistepi[sel_track - 1]], 0, 0, 1, seqr.track_chan[sel_track - 1]);
+            seqr.notes[seqr.presets[sel_track - 1]][sel_track - 1][seqr.multistepi[sel_track - 1]] = note;
+            seqr.vels[seqr.presets[sel_track - 1]][sel_track - 1][seqr.multistepi[sel_track - 1]] = vel;
+            seqr.seqs[seqr.presets[sel_track - 1]][sel_track - 1][seqr.multistepi[sel_track - 1]] = 1;
+            MIDIusb.sendNoteOn(note, vel, seqr.track_chan[sel_track - 1]);
+            break;
+          default: break;
+        }
+      }
+      break;
+    case TRIGATE:
+      if (marci_debug) Serial.println("Trigate");
+      switch (shifted) {
+        case 0:
+          seqr.vels[seqr.presets[sel_track - 1]][sel_track - 1][selstep] = note;
+          seqr.seqs[seqr.presets[sel_track - 1]][sel_track - 1][selstep] = 1;
+          break;
+        case 1:
+          // LIVE ENTRY
+          seqr.vels[seqr.presets[sel_track - 1]][sel_track - 1][seqr.multistepi[sel_track - 1]] = note;
+          seqr.seqs[seqr.presets[sel_track - 1]][sel_track - 1][seqr.multistepi[sel_track - 1]] = 1;
+          MIDIusb.sendNoteOn(seqr.track_notes[sel_track - 1], vel, seqr.track_chan[sel_track - 1]);
+          trellis.setPixelColor(seqr.multistepi[sel_track - 1], W100);
+          break;
+        default: break;
+      }
+      break;
+    case ARP: {
+      if (marci_debug) Serial.println("Arp");
+      switch (shifted) {
+        case 0:
+          if (marci_debug) Serial.println("Unshifted - ignore");
+          break;
+        case 1:
+          if (marci_debug) Serial.println("Sending to Arp");
+          arp.NoteOn(note);
+          break;
+        default: break;
+      }
+      break;
+    default: break;
     }
   }
 }
 
 void handle_midi_in_CC(uint8_t channel, uint8_t cc, uint8_t val) {
   Serial.println("CC Incoming");
-  switch (modes[sel_track - 1]) {
+  switch (seqr.modes[sel_track - 1]) {
     case CC:
-      vels[presets[sel_track - 1]][sel_track - 1][selstep] = val;
+      seqr.vels[seqr.presets[sel_track - 1]][sel_track - 1][selstep] = val;
       // LIVE ENTRY
-      //vels[presets[sel_track - 1]][sel_track - 1][currstep] = val;
+      // seqr.vels[seqr.presets[sel_track - 1]][sel_track - 1][seqr.multistepi[sel_track - 1]] = val;
       break;
     case NOTE:
-      notes[presets[sel_track - 1]][sel_track - 1][selstep] = val;
+      seqr.notes[seqr.presets[sel_track - 1]][sel_track - 1][selstep] = val;
       // LIVE ENTRY
-      //notes[presets[sel_track - 1]][sel_track - 1][currstep] = val;
+      // seqr.notes[seqr.presets[sel_track - 1]][sel_track - 1][seqr.multistepi[sel_track - 1]] = val;
       break;
     default: break;
   }
@@ -399,40 +315,93 @@ void midi_read_and_forward() {
   }
 }
 
-void configure_sequencer() {
-  Serial.println("configuring sequencer");
-  seqr.set_tempo(tempo);
-  seqr.ticks_per_step = cfg.step_size;
-  seqr.on_func = send_note_on;
-  seqr.off_func = send_note_off;
-  seqr.clk_func = send_clock_start_stop;
-  seqr.cc_func = send_cc;
-  seqr.send_clock = cfg.midi_send_clock;
-  seqr.length = length;
-  seqr.transpose = transpose;
-};
+void update_display() {
+  if (presetmode == 1 || chanedit == 1 || sure == 1 || divedit == 1) {
+    return;
+  }
+  uint32_t color = 0;
+  uint32_t hit = 0;
+  uint8_t trk_arr = sel_track - 1;
+
+  //active step ticker
+  if (gateedit == 1) {
+    hit = seqr.gates[seqr.presets[trk_arr]][trk_arr][seqr.multistepi[trk_arr]] > 0 ? PURPLE : W100;
+    color = seqr.gates[seqr.presets[trk_arr]][trk_arr][seqr.laststeps[trk_arr]] < 15 ? Wheel(seqr.gates[seqr.presets[trk_arr]][trk_arr][seqr.laststeps[trk_arr]] * 5) : seq_col(sel_track);
+  } else if (probedit == 1) {
+    hit = seqr.seqs[seqr.presets[trk_arr]][trk_arr][seqr.multistepi[trk_arr]] > 0 ? PURPLE : W100;
+    color = seqr.probs[seqr.presets[trk_arr]][trk_arr][seqr.laststeps[trk_arr]] < 10 ? Wheel(seqr.probs[seqr.presets[trk_arr]][trk_arr][seqr.laststeps[trk_arr]] * 10) : seq_col(sel_track);
+  } else if (veledit == 1) {
+    hit = seqr.multistepi[trk_arr] != selstep ? seqr.seqs[seqr.presets[trk_arr]][trk_arr][seqr.multistepi[trk_arr]] > 0 ? PURPLE : W100 : W100;
+    if (seqr.modes[trk_arr] == CC || seqr.modes[trk_arr] == NOTE) {
+      color = Wheel(seqr.vels[seqr.presets[trk_arr]][trk_arr][seqr.laststeps[trk_arr]]);
+    } else {
+      color = seq_dim(sel_track, seqr.vels[seqr.presets[trk_arr]][trk_arr][seqr.laststeps[trk_arr]]);
+    }
+  } else if (notesedit == 1) {
+    hit = seqr.multistepi[trk_arr] != selstep ? seqr.seqs[seqr.presets[trk_arr]][trk_arr][seqr.multistepi[trk_arr]] > 0 ? PURPLE : W100 : W100;
+    if (seqr.modes[trk_arr] == CC || seqr.modes[trk_arr] == NOTE) {
+      color = Wheel(seqr.notes[seqr.presets[trk_arr]][trk_arr][seqr.laststeps[trk_arr]]);
+    } else {
+      color = seq_dim(sel_track, seqr.notes[seqr.presets[trk_arr]][trk_arr][seqr.laststeps[trk_arr]]);
+    }
+  } else {
+    hit = seqr.seqs[seqr.presets[trk_arr]][trk_arr][seqr.multistepi[trk_arr]] > 0 ? PURPLE : W100;
+    color = seqr.seqs[seqr.presets[trk_arr]][trk_arr][seqr.laststeps[trk_arr]] > 0 ? seq_col(sel_track) : 0;
+  }
+  trellis.setPixelColor(seqr.multistepi[trk_arr], hit);
+  strip.setPixelColor(0, seqr.seqs[seqr.presets[trk_arr]][trk_arr][seqr.multistepi[trk_arr]] > 0 ? seq_col(sel_track) : (seqr.pulse == 1 ? W40 : 0));
+  if (seqr.modes[trk_arr] == CC && veledit == 1) {
+    trellis.setPixelColor(seqr.laststeps[trk_arr], seqr.laststeps[trk_arr] != selstep ? color : W100);
+  } else {
+    trellis.setPixelColor(seqr.laststeps[trk_arr], color);
+  }
+  if (seqr.offsets[trk_arr] - 1 > 0) trellis.setPixelColor(seqr.offsets[trk_arr] - 1, trk_arr > 1 ? R127 : B127);
+  if (seqr.lengths[trk_arr] < numsteps) trellis.setPixelColor(seqr.lengths[trk_arr] - 1, trk_arr != 4 ? C127 : G127);
+  trellis.show();
+  strip.show();
+}
+
+void reset_display() {
+  uint32_t hit = 0;
+  uint8_t trk_arr = sel_track - 1;
+  if (patedit == 1) {
+    hit = seqr.seqs[seqr.presets[trk_arr]][trk_arr][seqr.multistepi[trk_arr]] > 0 ? seq_col(sel_track) : W10;
+  } else if (gateedit == 1) {
+    hit = seqr.gates[seqr.presets[trk_arr]][trk_arr][seqr.multistepi[trk_arr]] > 0 ? seq_col(sel_track) : W10;
+  } else if (veledit == 1) {
+    hit = seqr.vels[seqr.presets[trk_arr]][trk_arr][seqr.multistepi[trk_arr]] > 0 ? seq_col(sel_track) : W10;
+  } else if (probedit == 1) {
+    hit = seqr.probs[seqr.presets[trk_arr]][trk_arr][seqr.multistepi[trk_arr]] > 0 ? seq_col(sel_track) : W10;
+  } else {
+    hit = W10;
+  }
+  trellis.setPixelColor(seqr.multistepi[trk_arr], hit);
+  strip.setPixelColor(0, seq_col(sel_track));
+  strip.show();
+  show_sequence(sel_track);
+}
 
 void toggle_selected(uint8_t keyId) {
   trellis.setPixelColor(lastsel + (numsteps - 1), seq_dim(lastsel, 40));
   trellis.setPixelColor(keyId, seq_col(sel_track));
-  if (run == 0) {
+  if (!seqr.playing) {
     strip.setPixelColor(0, seq_col(sel_track));
-    strip.show();
+    if (!seqr.playing) { strip.show(); }
   }
 }
 
 void show_sequence(uint8_t seq) {
   patedit = 1;
   for (uint8_t i = 0; i < numsteps; ++i) {
-    trellis.setPixelColor(i, seqs[presets[seq - 1]][seq - 1][i] > 0 ? seq_col(sel_track) : 0);
+    trellis.setPixelColor(i, seqr.seqs[seqr.presets[seq - 1]][seq - 1][i] > 0 ? seq_col(sel_track) : 0);
   }
-  if (run == 0) { trellis.show(); }
+  if (!seqr.playing) { trellis.show(); }
 }
 
 void set_gate(uint8_t gid, uint8_t stp, int c) {
-  uint32_t col = gates[presets[gid]][gid][stp] >= 15 ? c : Wheel(gates[presets[gid]][gid][stp] * 5);
+  uint32_t col = seqr.gates[seqr.presets[gid]][gid][stp] >= 15 ? c : Wheel(seqr.gates[seqr.presets[gid]][gid][stp] * 5);
   trellis.setPixelColor(stp, col);
-  if (run == 0) { trellis.show(); }
+  if (!seqr.playing) { trellis.show(); }
 }
 
 void show_gates(uint8_t seq) {
@@ -442,54 +411,54 @@ void show_gates(uint8_t seq) {
   for (uint8_t i = 0; i < numsteps; ++i) {
     set_gate(gateId, i, seq_col(seq));
   }
-  if (run == 0) { trellis.show(); }
+  if (!seqr.playing) { trellis.show(); }
 }
 
 void show_probabilities(uint8_t seq) {
   probedit = 1;
   uint32_t col = 0;
   for (uint8_t i = 0; i < numsteps; ++i) {
-    col = probs[presets[seq - 1]][seq - 1][i] == 10 ? seq_col(seq) : Wheel(probs[presets[seq - 1]][seq - 1][i] * 10);
+    col = seqr.probs[seqr.presets[seq - 1]][seq - 1][i] == 10 ? seq_col(seq) : Wheel(seqr.probs[seqr.presets[seq - 1]][seq - 1][i] * 10);
     trellis.setPixelColor(i, col);
   }
-  if (run == 0) { trellis.show(); }
+  if (!seqr.playing) { trellis.show(); }
 }
 
 void show_accents(uint8_t seq) { // velocities
   veledit = 1;
   uint32_t col = 0;
-  if (modes[seq - 1] == CC) {
+  if (seqr.modes[seq - 1] == CC) {
     for (uint8_t i = 0; i < numsteps; ++i) {
-      trellis.setPixelColor(i, Wheel(vels[presets[sel_track - 1]][seq - 1][i]));
+      trellis.setPixelColor(i, Wheel(seqr.vels[seqr.presets[sel_track - 1]][seq - 1][i]));
     }
   } else {
     for (uint8_t i = 0; i < numsteps; ++i) {
-      trellis.setPixelColor(i, seq_dim(seq, vels[presets[sel_track - 1]][seq - 1][i]));
+      trellis.setPixelColor(i, seq_dim(seq, seqr.vels[seqr.presets[sel_track - 1]][seq - 1][i]));
     }
   }
-  if (run == 0) { trellis.show(); }
+  if (!seqr.playing) { trellis.show(); }
 }
 
 void show_notes(uint8_t seq) {
   notesedit = 1;
   uint32_t col = 0;
-  if (modes[seq - 1] == NOTE) {
+  if (seqr.modes[seq - 1] == NOTE) {
     for (uint8_t i = 0; i < numsteps; ++i) {
-      trellis.setPixelColor(i, Wheel(notes[presets[sel_track - 1]][seq - 1][i]));
+      trellis.setPixelColor(i, Wheel(seqr.notes[seqr.presets[sel_track - 1]][seq - 1][i]));
     }
   } else {
     for (uint8_t i = 0; i < numsteps; ++i) {
-      trellis.setPixelColor(i, seq_dim(seq, notes[presets[sel_track - 1]][seq - 1][i]));
+      trellis.setPixelColor(i, seq_dim(seq, seqr.notes[seqr.presets[sel_track - 1]][seq - 1][i]));
     }
   }
-  if (run == 0) { trellis.show(); }
+  if (!seqr.playing) { trellis.show(); }
 }
 
 void show_presets() {
   for (uint8_t i = 0; i < numsteps; ++i) {
     trellis.setPixelColor(i, i < (numsteps / 2) ? 0 : W10);
   }
-  trellis.setPixelColor(presets[sel_track - 1], W100);
+  trellis.setPixelColor(seqr.presets[sel_track - 1], W100);
   trellis.show();
 }
 
@@ -497,7 +466,7 @@ void show_divisions() {
   for (uint8_t i = 0; i < numsteps; ++i) {
     trellis.setPixelColor(i, 0);
   }
-  trellis.setPixelColor(divs[presets[sel_track - 1]][sel_track - 1], seq_col(sel_track));
+  trellis.setPixelColor(seqr.divs[sel_track - 1], seq_col(sel_track));
   trellis.setPixelColor(53, O80);
   trellis.setPixelColor(52, W100);
   trellis.show();
@@ -518,7 +487,7 @@ void transpose_led() {
     default:
       break;
   }
-  if (run == 0) { trellis.show(); }
+  if (!seqr.playing) { trellis.show(); }
 }
 
 // Update Channel Config MODE buttons
@@ -526,7 +495,7 @@ void mode_leds(uint8_t track) {
   for (uint8_t i = X_DIM * 3; i < numsteps; ++i) {
     trellis.setPixelColor(i, 0);
   }
-  switch (modes[track - 1]) {
+  switch (seqr.modes[track - 1]) {
     case TRIGATE:
       trellis.setPixelColor(24, W100);
       break;
@@ -550,15 +519,15 @@ void mode_leds(uint8_t track) {
         };
       }
       break;
-    case CHORD:
+    case ARP:
       trellis.setPixelColor(27, W100);
       break;
-    case ARP:
+    case CHORD:
       trellis.setPixelColor(28, W100);
       break;
     default: break;
   }
-  if (run == 0) { trellis.show(); }
+  trellis.show();
 }
 
 // Initialise Channel Config display...
@@ -566,8 +535,8 @@ void init_chan_conf(uint8_t track) {
   for (uint8_t i = 0; i < numsteps; ++i) {
     trellis.setPixelColor(i, 0);
   }
-  trellis.setPixelColor(track_chan[track - 1] - 1, seq_col(track));
-  switch (modes[track - 1]) {
+  trellis.setPixelColor(seqr.track_chan[track - 1] - 1, seq_col(track));
+  switch (seqr.modes[track - 1]) {
     case TRIGATE:
       trellis.setPixelColor(24, W100);
       break;
@@ -591,15 +560,15 @@ void init_chan_conf(uint8_t track) {
         };
       }
       break;
-    case CHORD:
+    case ARP:
       trellis.setPixelColor(27, W100);
       break;
-    case ARP:
+    case CHORD:
       trellis.setPixelColor(28, W100);
       break;
     default: break;
   }
-  if (run == 0) { trellis.show(); }
+  trellis.show();
 }
 
 // Show "Are you sure, Y/N" display...
@@ -655,15 +624,15 @@ void init_interface() {
   trellis.setPixelColor(37, sel_track == 6 ? seq_col(sel_track) : seq_dim(6, 40));
   trellis.setPixelColor(38, sel_track == 7 ? seq_col(sel_track) : seq_dim(7, 40));
   trellis.setPixelColor(39, sel_track == 8 ? seq_col(sel_track) : seq_dim(8, 40));
-  //Mutes
-  trellis.setPixelColor(40, mutes[0] == 1 ? R80 : G40);
-  trellis.setPixelColor(41, mutes[1] == 1 ? R80 : G40);
-  trellis.setPixelColor(42, mutes[2] == 1 ? R80 : G40);
-  trellis.setPixelColor(43, mutes[3] == 1 ? R80 : G40);
-  trellis.setPixelColor(44, mutes[4] == 1 ? R80 : G40);
-  trellis.setPixelColor(45, mutes[5] == 1 ? R80 : G40);
-  trellis.setPixelColor(46, mutes[6] == 1 ? R80 : G40);
-  trellis.setPixelColor(47, mutes[7] == 1 ? R80 : G40);
+  //seqr.mutes
+  trellis.setPixelColor(40, seqr.mutes[0] == 1 ? R80 : G40);
+  trellis.setPixelColor(41, seqr.mutes[1] == 1 ? R80 : G40);
+  trellis.setPixelColor(42, seqr.mutes[2] == 1 ? R80 : G40);
+  trellis.setPixelColor(43, seqr.mutes[3] == 1 ? R80 : G40);
+  trellis.setPixelColor(44, seqr.mutes[4] == 1 ? R80 : G40);
+  trellis.setPixelColor(45, seqr.mutes[5] == 1 ? R80 : G40);
+  trellis.setPixelColor(46, seqr.mutes[6] == 1 ? R80 : G40);
+  trellis.setPixelColor(47, seqr.mutes[7] == 1 ? R80 : G40);
   //Panes
   trellis.setPixelColor(48, patedit == 1 ? R127 : R40);
   trellis.setPixelColor(49, veledit == 1 ? Y127 : Y40);
@@ -718,6 +687,7 @@ void init_interface() {
 
 #include "saveload.h"  /// FIXME:
 
+// in vast need of improvements for efficiency:
 TrellisCallback onKey(keyEvent evt) {
   auto const now = millis();
   auto const keyId = evt.bit.NUM;
@@ -741,8 +711,8 @@ TrellisCallback onKey(keyEvent evt) {
         }
       } else if (divedit == 1) { // TRACK CLOCK DIVIDER STEP EDIT
         if (keyId < (numsteps)) {
-          divs[presets[sel_track - 1]][sel_track - 1] = keyId;
-          divcounts[sel_track - 1] = -1;
+          seqr.divs[sel_track - 1] = keyId;
+          seqr.divcounts[sel_track - 1] = -1;
           show_divisions();
         } else if (keyId == 52) {
           divedit = 0;
@@ -768,21 +738,23 @@ TrellisCallback onKey(keyEvent evt) {
           for (uint8_t i = 0; i < numpresets; ++i) {
             trellis.setPixelColor(i, 0);
           }
-          trellis.setPixelColor(presets[sel_track - 1], 0);
+          trellis.setPixelColor(seqr.presets[sel_track - 1], 0);
           trellis.setPixelColor(keyId, W100);
-          presets[sel_track - 1] = keyId;
+          seqr.presets[sel_track - 1] = keyId;
+          // seqr.reset();
         } else if (keyId > ((numpresets - 1)) && keyId < (numpresets * 2)) {
-          trellis.setPixelColor(presets[sel_track - 1], 0);
+          trellis.setPixelColor(seqr.presets[sel_track - 1], 0);
           trellis.setPixelColor(keyId - (X_DIM * 2), W100);
           for (uint8_t i = 0; i < numpresets; ++i) {
-            presets[i] = (keyId - (X_DIM * 2));
+            seqr.presets[i] = (keyId - (X_DIM * 2));
+            // seqr.reset();
           }
         } else if (keyId > 39 && keyId < 48) {
-          if (mutes[keyId - 40] == 0) {
-            mutes[keyId - 40] = 1;
+          if (seqr.mutes[keyId - 40] == 0) {
+            seqr.mutes[keyId - 40] = 1;
             trellis.setPixelColor(keyId, R80);
           } else {
-            mutes[keyId - 40] = 0;
+            seqr.mutes[keyId - 40] = 0;
             trellis.setPixelColor(keyId, G80);
           }
         }
@@ -790,7 +762,7 @@ TrellisCallback onKey(keyEvent evt) {
       } else if (chanedit == 1 && keyId < numsteps) { // CHANNEL STEP EDIT
         if (keyId < 16) {
           uint8_t chan = keyId + 1;
-          track_chan[sel_track - 1] = chan;
+          seqr.track_chan[sel_track - 1] = chan;
           for (uint8_t i = 0; i < 16; ++i) {
             trellis.setPixelColor(i, 0);
           }
@@ -798,22 +770,22 @@ TrellisCallback onKey(keyEvent evt) {
         } else {
           switch (keyId) {
             case 24:
-              modes[sel_track - 1] = TRIGATE;
+              seqr.modes[sel_track - 1] = TRIGATE;
               break;
             case 25:
-              modes[sel_track - 1] = CC;
+              seqr.modes[sel_track - 1] = CC;
               break;
             case 26:
-              modes[sel_track - 1] = NOTE;
+              seqr.modes[sel_track - 1] = NOTE;
               break;
             case 27:
-              //modes[sel_track-1] = CHORD;
+              seqr.modes[sel_track-1] = ARP;
               break;
             case 28:
-              //modes[sel_track-1] = ARP;
+              //seqr.modes[sel_track-1] = CHORD;
               break;
             case 31:
-              if ((modes[sel_track - 1] == CC || modes[sel_track - 1] == NOTE) && (sel_track - 1 > 5)) {
+              if ((seqr.modes[sel_track - 1] == CC || seqr.modes[sel_track - 1] == NOTE) && (sel_track - 1 > 5)) {
                 hzv[(sel_track - 1) - 6] = hzv[(sel_track - 1) - 6] == 0 ? 1 : 0;
               }
               break;
@@ -824,8 +796,8 @@ TrellisCallback onKey(keyEvent evt) {
       } else if (chanedit == 1 && ((keyId > (numsteps - 1) + X_DIM && keyId < (numsteps) + X_DIM + 12) || (keyId > (numsteps) + X_DIM + 13 && keyId < (t_size - 2)))) {
         // do nothin'
       } else if (lenedit == 1 && keyId < numsteps) { // LENGTH EDIT
-        if (keyId + 1 >= offsets[sel_track - 1]) {
-          lengths[sel_track - 1] = keyId + 1;
+        if (keyId + 1 >= seqr.offsets[sel_track - 1]) {
+          seqr.lengths[sel_track - 1] = keyId + 1;
           //length = keyId + 1;
           lenedit = 0;
           trellis.setPixelColor(keyId, C127);
@@ -833,8 +805,8 @@ TrellisCallback onKey(keyEvent evt) {
           configure_sequencer();
         }
       } else if (offedit == 1 && keyId < numsteps) { // OFFSET EDIT
-        if (keyId + 1 <= lengths[sel_track - 1]) {
-          offsets[sel_track - 1] = keyId + 1;
+        if (keyId + 1 <= seqr.lengths[sel_track - 1]) {
+          seqr.offsets[sel_track - 1] = keyId + 1;
           //length = keyId + 1;
           offedit = 0;
           trellis.setPixelColor(keyId, B127);
@@ -844,178 +816,178 @@ TrellisCallback onKey(keyEvent evt) {
       } else if (gateedit == 1 && keyId < numsteps) { // GATE STEP EDIT
         uint8_t trk_arr = sel_track - 1;
         uint8_t gateId = trk_arr;
-        if (gates[presets[trk_arr]][gateId][keyId] >= 15) {
-          gates[presets[trk_arr]][gateId][keyId] = 0;
+        if (seqr.gates[seqr.presets[trk_arr]][gateId][keyId] >= 15) {
+          seqr.gates[seqr.presets[trk_arr]][gateId][keyId] = 0;
         }
-        gates[presets[trk_arr]][gateId][keyId] += 3;
+        seqr.gates[seqr.presets[trk_arr]][gateId][keyId] += 3;
         set_gate(gateId, keyId, seq_col(sel_track));
       } else if (probedit == 1 && keyId < numsteps) { // PROBABILITY STEP EDIT
         uint8_t trk_arr = sel_track - 1;
-        if (probs[presets[trk_arr]][trk_arr][keyId] == 10) {
-          probs[presets[trk_arr]][trk_arr][keyId] = 0;
+        if (seqr.probs[seqr.presets[trk_arr]][trk_arr][keyId] == 10) {
+          seqr.probs[seqr.presets[trk_arr]][trk_arr][keyId] = 0;
         }
-        probs[presets[trk_arr]][trk_arr][keyId] += 1;
-        col = probs[presets[trk_arr]][trk_arr][keyId] == 10 ? seq_col(sel_track) : Wheel(probs[presets[trk_arr]][trk_arr][keyId] * 10);
+        seqr.probs[seqr.presets[trk_arr]][trk_arr][keyId] += 1;
+        col = seqr.probs[seqr.presets[trk_arr]][trk_arr][keyId] == 10 ? seq_col(sel_track) : Wheel(seqr.probs[seqr.presets[trk_arr]][trk_arr][keyId] * 10);
         trellis.setPixelColor(keyId, col);
-        if (run == 0) { trellis.show(); }
+        if (!seqr.playing) { trellis.show(); }
       } else if (notesedit == 1 & keyId < numsteps) { // NOTES STEP EDIT
         uint8_t trk_arr = sel_track - 1;
-        if (modes[trk_arr] == CC || modes[trk_arr] == NOTE) {
+        if (seqr.modes[trk_arr] == CC || seqr.modes[trk_arr] == NOTE) {
           uint8_t prev_selstep = selstep;
           selstep = keyId;
-          trellis.setPixelColor(prev_selstep, Wheel(notes[presets[trk_arr]][trk_arr][prev_selstep]));
+          trellis.setPixelColor(prev_selstep, Wheel(seqr.notes[seqr.presets[trk_arr]][trk_arr][prev_selstep]));
           trellis.setPixelColor(selstep, W100);
         }
       } else if (veledit == 1 & keyId < numsteps) { // VELOCITY STEP EDIT
         uint8_t trk_arr = sel_track - 1;
-        if (modes[trk_arr] == CC || modes[trk_arr] == NOTE) {
+        if (seqr.modes[trk_arr] == CC || seqr.modes[trk_arr] == NOTE) {
           uint8_t prev_selstep = selstep;
           selstep = keyId;
-          trellis.setPixelColor(prev_selstep, Wheel(vels[presets[trk_arr]][trk_arr][prev_selstep]));
+          trellis.setPixelColor(prev_selstep, Wheel(seqr.vels[seqr.presets[trk_arr]][trk_arr][prev_selstep]));
           trellis.setPixelColor(selstep, W100);
         } else {
           switch (sel_track) {
             case 0:
               break;
             case 1:
-              switch (vels[presets[trk_arr]][trk_arr][keyId]) {
+              switch (seqr.vels[seqr.presets[trk_arr]][trk_arr][keyId]) {
                 case 127:
                   trellis.setPixelColor(keyId, R40);
-                  vels[presets[trk_arr]][trk_arr][keyId] = 40;
+                  seqr.vels[seqr.presets[trk_arr]][trk_arr][keyId] = 40;
                   break;
                 case 80:
                   trellis.setPixelColor(keyId, R127);
-                  vels[presets[trk_arr]][trk_arr][keyId] = 127;
+                  seqr.vels[seqr.presets[trk_arr]][trk_arr][keyId] = 127;
                   break;
                 case 40:
                   trellis.setPixelColor(keyId, R80);
-                  vels[presets[trk_arr]][trk_arr][keyId] = 80;
+                  seqr.vels[seqr.presets[trk_arr]][trk_arr][keyId] = 80;
                   break;
                 default:
                   break;
               }
               break;
             case 2:
-              switch (vels[presets[trk_arr]][trk_arr][keyId]) {
+              switch (seqr.vels[seqr.presets[trk_arr]][trk_arr][keyId]) {
                 case 127:
                   trellis.setPixelColor(keyId, O40);
-                  vels[presets[trk_arr]][trk_arr][keyId] = 40;
+                  seqr.vels[seqr.presets[trk_arr]][trk_arr][keyId] = 40;
                   break;
                 case 80:
                   trellis.setPixelColor(keyId, O127);
-                  vels[presets[trk_arr]][trk_arr][keyId] = 127;
+                  seqr.vels[seqr.presets[trk_arr]][trk_arr][keyId] = 127;
                   break;
                 case 40:
                   trellis.setPixelColor(keyId, O80);
-                  vels[presets[trk_arr]][trk_arr][keyId] = 80;
+                  seqr.vels[seqr.presets[trk_arr]][trk_arr][keyId] = 80;
                   break;
                 default:
                   break;
               }
               break;
             case 3:
-              switch (vels[presets[trk_arr]][trk_arr][keyId]) {
+              switch (seqr.vels[seqr.presets[trk_arr]][trk_arr][keyId]) {
                 case 127:
                   trellis.setPixelColor(keyId, Y40);
-                  vels[presets[trk_arr]][trk_arr][keyId] = 40;
+                  seqr.vels[seqr.presets[trk_arr]][trk_arr][keyId] = 40;
                   break;
                 case 80:
                   trellis.setPixelColor(keyId, Y127);
-                  vels[presets[trk_arr]][trk_arr][keyId] = 127;
+                  seqr.vels[seqr.presets[trk_arr]][trk_arr][keyId] = 127;
                   break;
                 case 40:
                   trellis.setPixelColor(keyId, Y80);
-                  vels[presets[trk_arr]][trk_arr][keyId] = 80;
+                  seqr.vels[seqr.presets[trk_arr]][trk_arr][keyId] = 80;
                   break;
                 default:
                   break;
               }
               break;
             case 4:
-              switch (vels[presets[trk_arr]][trk_arr][keyId]) {
+              switch (seqr.vels[seqr.presets[trk_arr]][trk_arr][keyId]) {
                 case 127:
                   trellis.setPixelColor(keyId, G40);
-                  vels[presets[trk_arr]][trk_arr][keyId] = 40;
+                  seqr.vels[seqr.presets[trk_arr]][trk_arr][keyId] = 40;
                   break;
                 case 80:
                   trellis.setPixelColor(keyId, G127);
-                  vels[presets[trk_arr]][trk_arr][keyId] = 127;
+                  seqr.vels[seqr.presets[trk_arr]][trk_arr][keyId] = 127;
                   break;
                 case 40:
                   trellis.setPixelColor(keyId, G80);
-                  vels[presets[trk_arr]][trk_arr][keyId] = 80;
+                  seqr.vels[seqr.presets[trk_arr]][trk_arr][keyId] = 80;
                   break;
                 default:
                   break;
               }
               break;
             case 5:
-              switch (vels[presets[trk_arr]][trk_arr][keyId]) {
+              switch (seqr.vels[seqr.presets[trk_arr]][trk_arr][keyId]) {
                 case 127:
                   trellis.setPixelColor(keyId, C40);
-                  vels[presets[trk_arr]][trk_arr][keyId] = 40;
+                  seqr.vels[seqr.presets[trk_arr]][trk_arr][keyId] = 40;
                   break;
                 case 80:
                   trellis.setPixelColor(keyId, C127);
-                  vels[presets[trk_arr]][trk_arr][keyId] = 127;
+                  seqr.vels[seqr.presets[trk_arr]][trk_arr][keyId] = 127;
                   break;
                 case 40:
                   trellis.setPixelColor(keyId, C80);
-                  vels[presets[trk_arr]][trk_arr][keyId] = 80;
+                  seqr.vels[seqr.presets[trk_arr]][trk_arr][keyId] = 80;
                   break;
                 default:
                   break;
               }
               break;
             case 6:
-              switch (vels[presets[trk_arr]][trk_arr][keyId]) {
+              switch (seqr.vels[seqr.presets[trk_arr]][trk_arr][keyId]) {
                 case 127:
                   trellis.setPixelColor(keyId, B40);
-                  vels[presets[trk_arr]][trk_arr][keyId] = 40;
+                  seqr.vels[seqr.presets[trk_arr]][trk_arr][keyId] = 40;
                   break;
                 case 80:
                   trellis.setPixelColor(keyId, B127);
-                  vels[presets[trk_arr]][trk_arr][keyId] = 127;
+                  seqr.vels[seqr.presets[trk_arr]][trk_arr][keyId] = 127;
                   break;
                 case 40:
                   trellis.setPixelColor(keyId, B80);
-                  vels[presets[trk_arr]][trk_arr][keyId] = 80;
+                  seqr.vels[seqr.presets[trk_arr]][trk_arr][keyId] = 80;
                   break;
                 default:
                   break;
               }
               break;
             case 7:
-              switch (vels[presets[trk_arr]][trk_arr][keyId]) {
+              switch (seqr.vels[seqr.presets[trk_arr]][trk_arr][keyId]) {
                 case 127:
                   trellis.setPixelColor(keyId, P40);
-                  vels[presets[trk_arr]][trk_arr][keyId] = 40;
+                  seqr.vels[seqr.presets[trk_arr]][trk_arr][keyId] = 40;
                   break;
                 case 80:
                   trellis.setPixelColor(keyId, P127);
-                  vels[presets[trk_arr]][trk_arr][keyId] = 127;
+                  seqr.vels[seqr.presets[trk_arr]][trk_arr][keyId] = 127;
                   break;
                 case 40:
                   trellis.setPixelColor(keyId, P80);
-                  vels[presets[trk_arr]][trk_arr][keyId] = 80;
+                  seqr.vels[seqr.presets[trk_arr]][trk_arr][keyId] = 80;
                   break;
                 default:
                   break;
               }
               break;
             case 8:
-              switch (vels[presets[trk_arr]][trk_arr][keyId]) {
+              switch (seqr.vels[seqr.presets[trk_arr]][trk_arr][keyId]) {
                 case 127:
                   trellis.setPixelColor(keyId, PK40);
-                  vels[presets[trk_arr]][trk_arr][keyId] = 40;
+                  seqr.vels[seqr.presets[trk_arr]][trk_arr][keyId] = 40;
                   break;
                 case 80:
                   trellis.setPixelColor(keyId, PK127);
-                  vels[presets[trk_arr]][trk_arr][keyId] = 127;
+                  seqr.vels[seqr.presets[trk_arr]][trk_arr][keyId] = 127;
                   break;
                 case 40:
                   trellis.setPixelColor(keyId, PK80);
-                  vels[presets[trk_arr]][trk_arr][keyId] = 80;
+                  seqr.vels[seqr.presets[trk_arr]][trk_arr][keyId] = 80;
                   break;
                 default:
                   break;
@@ -1028,51 +1000,19 @@ TrellisCallback onKey(keyEvent evt) {
       } else if (keyId < numsteps) { // STEP EDIT
         uint8_t trk_arr = sel_track - 1;
         col = W10;
-        switch (seqs[presets[trk_arr]][trk_arr][keyId]) {
+        switch (seqr.seqs[seqr.presets[trk_arr]][trk_arr][keyId]) {
           case 1:
-            seqs[presets[trk_arr]][trk_arr][keyId] = 0;
+            seqr.seqs[seqr.presets[trk_arr]][trk_arr][keyId] = 0;
             break;
           case 0:
             col = seq_col(sel_track);
-            seqs[presets[trk_arr]][trk_arr][keyId] = 1;
+            seqr.seqs[seqr.presets[trk_arr]][trk_arr][keyId] = 1;
             break;
         }
         trellis.setPixelColor(keyId, col);
       } else if (keyId < 40) { // SELECT TRACK 1 - 8
-        switch (keyId) {
-          case 32:
-            lastsel = sel_track;
-            sel_track = 1;
-            break;
-          case 33:
-            lastsel = sel_track;
-            sel_track = 2;
-            break;
-          case 34:
-            lastsel = sel_track;
-            sel_track = 3;
-            break;
-          case 35:
-            lastsel = sel_track;
-            sel_track = 4;
-            break;
-          case 36:
-            lastsel = sel_track;
-            sel_track = 5;
-            break;
-          case 37:
-            lastsel = sel_track;
-            sel_track = 6;
-            break;
-          case 38:
-            lastsel = sel_track;
-            sel_track = 7;
-            break;
-          case 39:
-            lastsel = sel_track;
-            sel_track = 8;
-            break;
-        }
+        lastsel = sel_track;
+        sel_track = keyId - (numsteps - 1);
         toggle_selected(keyId);
         if (presetmode == 1) {
           show_presets();
@@ -1108,74 +1048,74 @@ TrellisCallback onKey(keyEvent evt) {
         uint8_t trk_arr = sel_track - 1;
         switch (keyId) {
           case 40: // MUTE 1
-            if (mutes[0] == 0) {
-              mutes[0] = 1;
+            if (seqr.mutes[0] == 0) {
+              seqr.mutes[0] = 1;
               trellis.setPixelColor(40, R80);
             } else {
-              mutes[0] = 0;
+              seqr.mutes[0] = 0;
               trellis.setPixelColor(40, G40);
             }
             break;
           case 41: // MUTE 2
-            if (mutes[1] == 0) {
-              mutes[1] = 1;
+            if (seqr.mutes[1] == 0) {
+              seqr.mutes[1] = 1;
               trellis.setPixelColor(41, R80);
             } else {
-              mutes[1] = 0;
+              seqr.mutes[1] = 0;
               trellis.setPixelColor(41, G40);
             }
             break;
           case 42: // MUTE 3
-            if (mutes[2] == 0) {
-              mutes[2] = 1;
+            if (seqr.mutes[2] == 0) {
+              seqr.mutes[2] = 1;
               trellis.setPixelColor(42, R80);
             } else {
-              mutes[2] = 0;
+              seqr.mutes[2] = 0;
               trellis.setPixelColor(42, G40);
             }
             break;
           case 43: // MUTE 4
-            if (mutes[3] == 0) {
-              mutes[3] = 1;
+            if (seqr.mutes[3] == 0) {
+              seqr.mutes[3] = 1;
               trellis.setPixelColor(43, R80);
             } else {
-              mutes[3] = 0;
+              seqr.mutes[3] = 0;
               trellis.setPixelColor(43, G40);
             }
             break;
           case 44: // MUTE 5
-            if (mutes[4] == 0) {
-              mutes[4] = 1;
+            if (seqr.mutes[4] == 0) {
+              seqr.mutes[4] = 1;
               trellis.setPixelColor(44, R80);
             } else {
-              mutes[4] = 0;
+              seqr.mutes[4] = 0;
               trellis.setPixelColor(44, G40);
             }
             break;
           case 45: // MUTE 6
-            if (mutes[5] == 0) {
-              mutes[5] = 1;
+            if (seqr.mutes[5] == 0) {
+              seqr.mutes[5] = 1;
               trellis.setPixelColor(45, R80);
             } else {
-              mutes[5] = 0;
+              seqr.mutes[5] = 0;
               trellis.setPixelColor(45, G40);
             }
             break;
           case 46: // MUTE 7
-            if (mutes[6] == 0) {
-              mutes[6] = 1;
+            if (seqr.mutes[6] == 0) {
+              seqr.mutes[6] = 1;
               trellis.setPixelColor(46, R80);
             } else {
-              mutes[6] = 0;
+              seqr.mutes[6] = 0;
               trellis.setPixelColor(46, G40);
             }
             break;
           case 47: // MUTE 8
-            if (mutes[7] == 0) {
-              mutes[7] = 1;
+            if (seqr.mutes[7] == 0) {
+              seqr.mutes[7] = 1;
               trellis.setPixelColor(47, R80);
             } else {
-              mutes[7] = 0;
+              seqr.mutes[7] = 0;
               trellis.setPixelColor(47, G40);
             }
             break;
@@ -1277,7 +1217,7 @@ TrellisCallback onKey(keyEvent evt) {
             }
             break;
           case 53: // TRANSPOSE | ^TRACK DIVISION (RUNNING) | ^CHANNEL CONFIG (STOPPED)
-            if (run == 0) {
+            if (!seqr.playing) {
               if (shifted == 0) {
                 switch (transpose) {
                   case 0:
@@ -1393,7 +1333,7 @@ TrellisCallback onKey(keyEvent evt) {
             if (chanedit == 0) { seqr.stop(); }
             break;
           case 58: // RESET
-            if (chanedit == 0) { seqr.reset(); }
+            if (chanedit == 0) { resetflag = 1; }
             break;
           case 59: // WRITE
             if (chanedit == 0) {
@@ -1421,14 +1361,14 @@ TrellisCallback onKey(keyEvent evt) {
             break;
           case 61: // CLOCK ON/OFF
             if (swingedit == 1) {
-              swing = 0;
+              seqr.swing= 0;
             } else if (veledit == 1) {
               for (uint8_t i = 0; i < numsteps; ++i) {
-                vels[presets[sel_track - 1]][sel_track - 1][i] = 72;
+                seqr.vels[seqr.presets[sel_track - 1]][sel_track - 1][i] = 72;
               }
             } else if (notesedit == 1) {
               for (uint8_t i = 0; i < numsteps; ++i) {
-                notes[presets[sel_track - 1]][sel_track - 1][i] = 0;
+                seqr.notes[seqr.presets[sel_track - 1]][sel_track - 1][i] = 0;
               }
             } else {
               if (cfg.midi_send_clock == true) {
@@ -1442,35 +1382,41 @@ TrellisCallback onKey(keyEvent evt) {
             }
             break;
           case 62: // PARAM -
-            if (chanedit == 1) {
+            if (seqr.modes[trk_arr] == ARP && patedit == 1) {
+              if (shifted == 0) {
+                arppattern = arppattern > 1 ? arppattern - 1 : 7;
+              } else if (shifted == 1) {
+                arpoctave = arpoctave > 1 ? arpoctave - 1 : 4;
+              }
+            } else if (chanedit == 1) {
               brightness = brightness > 15 ? brightness - 10 : 5;
               init_interface();
               init_chan_conf(sel_track);
             } else if (gateedit == 1 && swingedit == 0) {
-              for (uint8_t i = 0; i < 32; ++i) {
-                gates[presets[trk_arr]][trk_arr][i] = gates[presets[trk_arr]][trk_arr][i] - 1 > 1 ? gates[presets[trk_arr]][trk_arr][i] - 1 : 1;
-                if (run == 0) set_gate(sel_track - 1, i, seq_col(sel_track));
+              for (uint8_t i = 0; i < numsteps; ++i) {
+                seqr.gates[seqr.presets[trk_arr]][trk_arr][i] = seqr.gates[seqr.presets[trk_arr]][trk_arr][i] - 1 > 1 ? seqr.gates[seqr.presets[trk_arr]][trk_arr][i] - 1 : 1;
+                if (!seqr.playing) set_gate(sel_track - 1, i, seq_col(sel_track));
               }
-              if (run == 0) { trellis.show(); }
+              if (!seqr.playing) { trellis.show(); }
             } else if (shifted == 1 && swingedit == 0) {
-              track_notes[sel_track - 1] = track_notes[sel_track - 1] > 0 ? track_notes[sel_track - 1] - 1 : 127;
+              seqr.track_notes[sel_track - 1] = seqr.track_notes[sel_track - 1] > 0 ? seqr.track_notes[sel_track - 1] - 1 : 127;
             } else if (shifted == 1 && swingedit == 1) {
-              swing = swing > 0 ? swing - 1 : 0;
+              seqr.swing= seqr.swing> 0 ? seqr.swing- 1 : 0;
             } else if (probedit == 1) {
               for (uint8_t i = 0; i < numsteps; ++i) {
-                probs[presets[sel_track - 1]][sel_track - 1][i] = probs[presets[sel_track - 1]][sel_track - 1][i] > 1 ? probs[presets[sel_track - 1]][sel_track - 1][i] - 1 : 1;
+                seqr.probs[seqr.presets[sel_track - 1]][sel_track - 1][i] = seqr.probs[seqr.presets[sel_track - 1]][sel_track - 1][i] > 1 ? seqr.probs[seqr.presets[sel_track - 1]][sel_track - 1][i] - 1 : 1;
               }
             } else if (veledit == 1) {
-              if (modes[sel_track - 1] == CC || modes[sel_track - 1] == NOTE) {
-                vels[presets[sel_track - 1]][sel_track - 1][selstep] = vels[presets[sel_track - 1]][sel_track - 1][selstep] > 5 ? vels[presets[sel_track - 1]][sel_track - 1][selstep] - 1 : 0;
+              if (seqr.modes[sel_track - 1] == CC || seqr.modes[sel_track - 1] == NOTE) {
+                seqr.vels[seqr.presets[sel_track - 1]][sel_track - 1][selstep] = seqr.vels[seqr.presets[sel_track - 1]][sel_track - 1][selstep] > 5 ? seqr.vels[seqr.presets[sel_track - 1]][sel_track - 1][selstep] - 1 : 0;
               } else {
                 for (uint8_t i = 0; i < numsteps; ++i) {
-                  vels[presets[sel_track - 1]][sel_track - 1][i] = vels[presets[sel_track - 1]][sel_track - 1][i] > 5 ? vels[presets[sel_track - 1]][sel_track - 1][i] - 5 : 0;
+                  seqr.vels[seqr.presets[sel_track - 1]][sel_track - 1][i] = seqr.vels[seqr.presets[sel_track - 1]][sel_track - 1][i] > 5 ? seqr.vels[seqr.presets[sel_track - 1]][sel_track - 1][i] - 5 : 0;
                 }
               }
             } else if (notesedit == 1) {
-              if (modes[sel_track - 1] == CC || modes[sel_track - 1] == NOTE) {
-                notes[presets[sel_track - 1]][sel_track - 1][selstep] = notes[presets[sel_track - 1]][sel_track - 1][selstep] > 0 ? notes[presets[sel_track - 1]][sel_track - 1][selstep] - 1 : 0;
+              if (seqr.modes[sel_track - 1] == CC || seqr.modes[sel_track - 1] == NOTE) {
+                seqr.notes[seqr.presets[sel_track - 1]][sel_track - 1][selstep] = seqr.notes[seqr.presets[sel_track - 1]][sel_track - 1][selstep] > 0 ? seqr.notes[seqr.presets[sel_track - 1]][sel_track - 1][selstep] - 1 : 0;
               }
             } else {
               tempo = tempo - 1;
@@ -1478,35 +1424,41 @@ TrellisCallback onKey(keyEvent evt) {
             }
             break;
           case 63: // PARAM +
-            if (chanedit == 1) {
+            if (seqr.modes[trk_arr] == ARP && patedit == 1) {
+              if (shifted == 0) {
+                arppattern = arppattern < 7 ? arppattern + 1 : 1;
+              } else if (shifted == 1) {
+                arpoctave = arpoctave < 4 ? arpoctave + 1 : 4;
+              }
+            } else if (chanedit == 1) {
               brightness = brightness < 117 ? brightness + 10 : 127;
               init_interface();
               init_chan_conf(sel_track);
             } else if (gateedit == 1 && swingedit == 0) {
-              for (uint8_t i = 0; i < 32; ++i) {
-                gates[presets[trk_arr]][trk_arr][i] = gates[presets[trk_arr]][trk_arr][i] + 1 < 15 ? gates[presets[trk_arr]][trk_arr][i] + 1 : 15;
-                if (run == 0) set_gate(sel_track - 1, i, seq_col(sel_track));
+              for (uint8_t i = 0; i < numsteps; ++i) {
+                seqr.gates[seqr.presets[trk_arr]][trk_arr][i] = seqr.gates[seqr.presets[trk_arr]][trk_arr][i] + 1 < 15 ? seqr.gates[seqr.presets[trk_arr]][trk_arr][i] + 1 : 15;
+                if (!seqr.playing) set_gate(sel_track - 1, i, seq_col(sel_track));
               }
-              if (run == 0) { trellis.show(); }
+              if (!seqr.playing) { trellis.show(); }
             } else if (shifted == 1 && swingedit == 0) {
-              track_notes[sel_track - 1] = track_notes[sel_track - 1] < 127 ? track_notes[sel_track - 1] + 1 : 1;
+              seqr.track_notes[sel_track - 1] = seqr.track_notes[sel_track - 1] < 127 ? seqr.track_notes[sel_track - 1] + 1 : 1;
             } else if (shifted == 1 && swingedit == 1) {
-              swing = swing < 30 ? swing + 1 : 30;
+              seqr.swing= seqr.swing< 30 ? seqr.swing+ 1 : 30;
             } else if (probedit == 1) {
               for (uint8_t i = 0; i < numsteps; ++i) {
-                probs[presets[sel_track - 1]][sel_track - 1][i] = probs[presets[sel_track - 1]][sel_track - 1][i] < 10 ? probs[presets[sel_track - 1]][sel_track - 1][i] + 1 : 10;
+                seqr.probs[seqr.presets[sel_track - 1]][sel_track - 1][i] = seqr.probs[seqr.presets[sel_track - 1]][sel_track - 1][i] < 10 ? seqr.probs[seqr.presets[sel_track - 1]][sel_track - 1][i] + 1 : 10;
               }
             } else if (veledit == 1) {
-              if (modes[sel_track - 1] == CC || modes[sel_track - 1] == NOTE) {
-                vels[presets[sel_track - 1]][sel_track - 1][selstep] = vels[presets[sel_track - 1]][sel_track - 1][selstep] < 122 ? vels[presets[sel_track - 1]][sel_track - 1][selstep] + 1 : 127;
+              if (seqr.modes[sel_track - 1] == CC || seqr.modes[sel_track - 1] == NOTE) {
+                seqr.vels[seqr.presets[sel_track - 1]][sel_track - 1][selstep] = seqr.vels[seqr.presets[sel_track - 1]][sel_track - 1][selstep] < 122 ? seqr.vels[seqr.presets[sel_track - 1]][sel_track - 1][selstep] + 1 : 127;
               } else {
                 for (uint8_t i = 0; i < numsteps; ++i) {
-                  vels[presets[sel_track - 1]][sel_track - 1][i] = vels[presets[sel_track - 1]][sel_track - 1][i] < 122 ? vels[presets[sel_track - 1]][sel_track - 1][i] + 5 : 127;
+                  seqr.vels[seqr.presets[sel_track - 1]][sel_track - 1][i] = seqr.vels[seqr.presets[sel_track - 1]][sel_track - 1][i] < 122 ? seqr.vels[seqr.presets[sel_track - 1]][sel_track - 1][i] + 5 : 127;
                 }
               }
             } else if (notesedit == 1) {
-              if (modes[sel_track - 1] == CC || modes[sel_track - 1] == NOTE) {
-                notes[presets[sel_track - 1]][sel_track - 1][selstep] = notes[presets[sel_track - 1]][sel_track - 1][selstep] < 127 ? notes[presets[sel_track - 1]][sel_track - 1][selstep] + 1 : 127;
+              if (seqr.modes[sel_track - 1] == CC || seqr.modes[sel_track - 1] == NOTE) {
+                seqr.notes[seqr.presets[sel_track - 1]][sel_track - 1][selstep] = seqr.notes[seqr.presets[sel_track - 1]][sel_track - 1][selstep] < 127 ? seqr.notes[seqr.presets[sel_track - 1]][sel_track - 1][selstep] + 1 : 127;
               }
             } else {
               tempo = tempo + 1;
@@ -1523,6 +1475,21 @@ TrellisCallback onKey(keyEvent evt) {
   }
   return nullptr;
 }
+
+void configure_sequencer() {
+  if (marci_debug) Serial.println(F("Configuring sequencer"));
+  seqr.set_tempo(tempo);
+  seqr.ticks_per_step = cfg.step_size;
+  seqr.on_func = send_note_on;
+  seqr.off_func = send_note_off;
+  seqr.clk_func = send_clock_start_stop;
+  seqr.cc_func = send_cc;
+  seqr.disp_func = update_display;
+  seqr.reset_func = reset_display;
+  seqr.send_clock = cfg.midi_send_clock;
+  seqr.length = length;
+  seqr.transpose = transpose;
+};
 
 void init_flash() {
   if (!flash.begin()) {
@@ -1578,19 +1545,32 @@ void setup() {
   MIDIusb.setHandleNoteOn(handle_midi_in_NoteOn);
   MIDIusb.setHandleNoteOff(handle_midi_in_NoteOff);
   MIDIusb.setHandleControlChange(handle_midi_in_CC);
-
   MIDIusb.begin(MIDI_CHANNEL_OMNI);
   MIDIusb.turnThruOff();  // turn off echo
 
   for (uint8_t i = 0; i < sizeof(gatepins); ++i) {
     pinMode(gatepins[i], OUTPUT);  //digtal (gate) out
   }
-  //analogWriteResolution(12); //analog to 12bit (0-4095)
 
   Serial.begin(115200);
   if (marci_debug) { delay(2000); }
   init_flash();
-  Serial.println(freeMemory());
+  if (marci_debug) { Serial.println(freeMemory()); }
+
+  // For the sake of sanity and...
+  for (uint8_t t = 0; t < numtracks; t++) {
+    seqr.divs[t] = 0;
+    seqr.lengths[t] = t_size / 2;
+    seqr.divcounts[t] = -1;
+    seqr.offsets[t] = 0;
+    seqr.outcomes[t] = 1;
+    seqr.multistepi[t] = -1;
+  }
+  patedit = patedit == 0 ? 1 : patedit;
+  sel_track = sel_track == 0 ? 1 : sel_track;
+  lastsel = lastsel == 0 ? 1 : sel_track;
+
+  // Load in saved slots...
   sequences_read();
   notes_read();
   velocities_read();
@@ -1598,37 +1578,27 @@ void setup() {
   gates_read();
   settings_read();
   configure_sequencer();
+
   if (!trellis.begin()) {
-    Serial.println(F("failed to begin trellis"));
+    if (marci_debug) { Serial.println(F("failed to begin trellis")); }
     while (1) delay(1);
   } else {
-    Serial.println(F("Trellis Init..."));
+    if (marci_debug) { Serial.println(F("Trellis Init...")); }
   }
+
   strip.begin();
-  strip.setPixelColor(0, seq_col(1));
+  strip.setPixelColor(0, seq_col(sel_track));
   strip.show();
 
   randomSeed(analogRead(0));  // for probability
 
-  for (uint8_t l = 0; l < numseqs; l++) {
-    lengths[l] = t_size / 2;
-    
-    divcounts[l] = 0;
-    offsets[l] = 0;
-    outcomes[l] = 1;
-    for (uint8_t p = 0; p < numpresets; p++) {
-      divs[p][l] = 0;
-    }
+  init_interface();
+  if (marci_debug) { 
+    Serial.println(freeMemory());
+    Serial.println(F("GO!"));
   }
 
-  patedit = patedit == 0 ? 1 : patedit;
-  sel_track = sel_track == 0 ? 1 : sel_track;
-  lastsel = lastsel == 0 ? 1 : sel_track;
-
-  init_interface();
-  Serial.println(freeMemory());
-  Serial.println(F("GO!"));
-  show_sequence(1);
+  show_sequence(sel_track);
 }
 
 //

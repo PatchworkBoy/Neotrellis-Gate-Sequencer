@@ -1,13 +1,14 @@
 # Neotrellis MIDI & Analogue CV/Gate Sequencer
 [![YouTube Demo Video](http://img.youtube.com/vi/L5sNkB95-T4/0.jpg)](http://www.youtube.com/watch?v=L5sNkB95-T4 "Demo Video")
 
-An 8 track 32 step MIDI (over USB) & Analog note/modulation/gate/trigger sequencer, with 2 tracks of Analog CV (control voltage) Output and MIDI Clock Generator (with swing) for Feather M4 Express / Neotrellis 8x8, featuring per-step per-track per-pattern note & velocity & probability & gatelength & clock division layers, performance mutes and per-track loop-length (both start and endpoint) control.
+An 8 track 32 step MIDI (over USB) & Analog note/modulation/gate/trigger sequencer & multi-mode arpeggiator, with 2 tracks of Analog CV (control voltage) Output and MIDI Clock Generator (with swing) for Feather M4 Express / Neotrellis 8x8, featuring per-step per-track per-pattern note & velocity & probability & gatelength & per-track clock division layers, performance mutes and per-track loop-length (both start and endpoint) control.
 16 storable preset patterns per track (all layers stored). Customisable note-per-track (Trigger/Gate mode) and channel-per-track.
+One track can be assigned as an arpeggiator for live arpeggiation of incoming MIDI notes / chords.
 
-3 octave CV (v/oct, switchable to 2 octave Hz/V) Output for track 7 & 8 on pins A0 & A1 when tracks in CC or NOTE Mode.
+3 octave CV (v/oct, switchable to 2 octave Hz/V) Output for track 7 & 8 on pins A0 & A1 when tracks in CC or NOTE.
 Track 1-8 Gates always output on digital io pins D4/5/6/9/10/11/12/13 (sending a 0-3.2v trigger/gate).
 
-Analog CV/Gate outputs are NOT regulated or protected in any way. Whack a 1k resistor between pin and 3.5mm TRS socket tip. Analog output is  proof of concept. There's something squonky going on with the Feather M4's DACs (when used with my Neutron and K2) where they cannot hold an output voltage for long unless retriggered. Keep release of triggered gates short, else you'll hear drift-down to 0v oddities.
+Analog CV/Gate outputs are NOT regulated or protected in any way. Whack a 1k resistor between pin and 3.5mm TRS socket tip. Analog output is merely proof of concept. There's something squonky going on with the Feather M4's DACs (when used with my Neutron and K2) where they cannot hold an output voltage for long unless retriggered. Keep Release of your gates short, else you'll here drift-down to 0v oddities.
 
 
 Adapted from https://github.com/todbot/picostepseq/
@@ -27,7 +28,7 @@ NeoTrellis Surface...
 - Row 8: Toggle Play/Stop | Stop | Reset | SAVE | PRESETS / ^Factory Reset | MIDICLOCK Send On/Off | param - | param +
 
 PARAM -/+
-- Pattern Edit - param = tempo, step = on/off
+- Pattern Edit - param = tempo (unless track is in ARP mode), step = on/off
 - Velocity Edit - param = all velocities (+/- 10), step = step velocity cycle (40/180/127)
 - Probability Edit - param = all probabilities (+/- 10%), step = step probability cycle (+10%)
 - Gate Length Edit - param = all gate lengths (+/- 10%), step = gate length cycle (+10%)
@@ -42,7 +43,7 @@ PRESETS mode:
 
 CONFIG mode:
 - Row 1 & 2 - set MIDI channel 1 to 16 for selected track
-- Row 4 - set selected tracks mode: Trigger/Gate, CC, or NOTE (buttons 1 - 3)
+- Row 4 - set selected tracks mode: Trigger/Gate, CC, NOTE, or ARP (buttons 1 - 4)
 - Row 4 - set v/oct (white) & hz/v (purple) when in NOTE or CC mode with button 8.
 
 Analog gates are sent in all modes. Analog CV is sent only for track 7 & 8 when in CC or NOTE mode.
@@ -51,12 +52,36 @@ Track Modes (over MIDI):
 - Trigger/Gate - Outputs fixed MIDI Note for all steps, Velocity, Gate On/Off
 - CC - Outputs CC, Value, Gate On/Off
 - NOTE - Outputs per-step note, Velocity, Gate On/Off
+- ARP - Outputs per-step note, Velocity, Gate On/Off [!1 instance only at the moment!]
+
+For the currently selected track...
 
 In Trigger/Gate mode, with SHIFT toggled on, incoming MIDI is realtime mapped to step on/off.
+
 In CC or NOTE mode, Velocity pane allows step selection... and then:
+
  - In CC mode, param +/- changes CC Value, and incoming MIDI note is captured to selected step as value. 
  - In NOTE mode, param +/- changes Note, MIDI Input is captured to selected step (both velocity and note). Vel pane + SHIFT = MIDI Input is listened to and notes/velocity captured to current playing step in realtime.
- 
+
+ In ARP mode with SHIFT toggled on...
+ - held incoming midi notes (played live via external source) are arpeggiated in accordance with chosen pattern over chosen number of octaves.
+ - the arp engine's notestack can hold a maximum of 10 notes (cos 8 fingers, 2 thumbs). Once full, oldest note shuffles off the pile to make way for newest note.
+ - On Pattern Edit view, param +/- cycles thru number of octaves (1-4)
+ ...with SHIFT toggled off...
+ - On Pattern Edit view, param +/- cycles thru patterns (1-7)
+
+ Arp Patterns:
+ 1 - Up - Notes are played from lowest to highest
+ 2 - Down - Notes are played from highest to lowest
+ 3 - Inclusive - Notes are played from lowest to highest, then highest to lowest; the bottom and top notes are played twice
+ 4 - Exclusive - Notes are played from lowest to highest, then highest to lowest; the bottom and top notes are played only once
+ 5 - Outside In - Notes are played lowest then highest, then second lowest and second highest, and so forth until they meet in the middle
+ 6 - Order - Notes are played in the order that they come in
+ 7 - Random - Notes are played randomly
+
+ To LATCH the arpeggio, change selected track then let go of the keys.
+ Currently latched arpeggio will remain latched until you return to arpeggio track, put it in shift mode - it is now armed unlatch when you hit the next note / chord and start a new arpeggio. The arpeggiator is clocked by the selected track's sequencer pattern, and respects all the layers (velocity / probability / gatelength) & any clock division.
+
 
 Outputs optional self-generated MIDI Clock (24 PPQN), Play/Stop/Reset (ideal for use in VCV rack with MIDI > CV module)
 - Default BPM: 120, adjustable via param buttons in -/+ 1 increments. Swing (+/- 30% max) is also applied to clock output.
