@@ -71,13 +71,13 @@ In CC or NOTE mode, Velocity pane allows step selection... and then:
  - On Pattern Edit view, param +/- cycles thru patterns (1-7)
 
  Arp Patterns:
- 1 - Up - Notes are played from lowest to highest
- 2 - Down - Notes are played from highest to lowest
- 3 - Inclusive - Notes are played from lowest to highest, then highest to lowest; the bottom and top notes are played twice
- 4 - Exclusive - Notes are played from lowest to highest, then highest to lowest; the bottom and top notes are played only once
- 5 - Outside In - Notes are played lowest then highest, then second lowest and second highest, and so forth until they meet in the middle
- 6 - Order - Notes are played in the order that they come in
- 7 - Random - Notes are played randomly
+ - 1 - Up - Notes are played from lowest to highest
+ - 2 - Down - Notes are played from highest to lowest
+ - 3 - Inclusive - Notes are played from lowest to highest, then highest to lowest; the bottom and top notes are played twice
+ - 4 - Exclusive - Notes are played from lowest to highest, then highest to lowest; the bottom and top notes are played only once
+ - 5 - Outside In - Notes are played lowest then highest, then second lowest and second highest, and so forth until they meet in the middle
+ - 6 - Order - Notes are played in the order that they come in
+ - 7 - Random - Notes are played randomly
 
  To LATCH the arpeggio, change selected track then let go of the keys.
  Currently latched arpeggio will remain latched until you return to arpeggio track, put it in shift mode - it is now armed unlatch when you hit the next note / chord and start a new arpeggio. Each arpeggiator is clocked by the selected track's sequencer pattern, and respects all the layers (velocity / probability / gatelength) & any clock division. Each arpeggiator is independent, and can have it's own pattern and octave range.
