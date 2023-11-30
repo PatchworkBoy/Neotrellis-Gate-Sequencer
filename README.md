@@ -1,9 +1,9 @@
 # Neotrellis MIDI & Analogue CV/Gate Sequencer
 [![YouTube Demo Video](http://img.youtube.com/vi/L5sNkB95-T4/0.jpg)](http://www.youtube.com/watch?v=L5sNkB95-T4 "Demo Video")
 
-An 8 track 32 step MIDI (over USB) & Analog note/modulation/gate/trigger sequencer & multi-mode arpeggiator, with 2 tracks of Analog CV (control voltage) Output and MIDI Clock Generator (with swing) for Feather M4 Express / Neotrellis 8x8, featuring per-step per-track per-pattern note & velocity & probability & gatelength & per-track clock division layers, performance mutes and per-track loop-length (both start and endpoint) control.
+An 8 track 32 step MIDI (over USB) & Analog note/modulation/gate/trigger sequencer with multi-mode arpeggiators available on 4 tracks, 2 tracks of Analog CV (control voltage) Output and MIDI Clock Generator (with swing) for Feather M4 Express / Neotrellis 8x8, featuring per-step per-track per-pattern note & velocity & probability & gatelength & per-track clock division layers, performance mutes and per-track loop-length (both start and endpoint) control.
 16 storable preset patterns per track (all layers stored). Customisable note-per-track (Trigger/Gate mode) and channel-per-track.
-One track can be assigned as an arpeggiator for live arpeggiation of incoming MIDI notes / chords.
+Tracks 5 thru 8 can be assigned as arpeggiators for live arpeggiation of incoming MIDI notes / chords.
 
 3 octave CV (v/oct, switchable to 2 octave Hz/V) Output for track 7 & 8 on pins A0 & A1 when tracks in CC or NOTE.
 Track 1-8 Gates always output on digital io pins D4/5/6/9/10/11/12/13 (sending a 0-3.2v trigger/gate).
@@ -43,7 +43,7 @@ PRESETS mode:
 
 CONFIG mode:
 - Row 1 & 2 - set MIDI channel 1 to 16 for selected track
-- Row 4 - set selected tracks mode: Trigger/Gate, CC, NOTE, or ARP (buttons 1 - 4)
+- Row 4 - set selected tracks mode: Trigger/Gate, CC, NOTE, or ARP (buttons 1 - 4, ARP for trk 5 thru 8 only)
 - Row 4 - set v/oct (white) & hz/v (purple) when in NOTE or CC mode with button 8.
 
 Analog gates are sent in all modes. Analog CV is sent only for track 7 & 8 when in CC or NOTE mode.
@@ -52,7 +52,7 @@ Track Modes (over MIDI):
 - Trigger/Gate - Outputs fixed MIDI Note for all steps, Velocity, Gate On/Off
 - CC - Outputs CC, Value, Gate On/Off
 - NOTE - Outputs per-step note, Velocity, Gate On/Off
-- ARP - Outputs per-step note, Velocity, Gate On/Off [!1 instance only at the moment!]
+- ARP - available on tracks 5 thru 8 - Outputs per-step note, Velocity, Gate On/Off 
 
 For the currently selected track...
 
@@ -67,8 +67,7 @@ In CC or NOTE mode, Velocity pane allows step selection... and then:
  - held incoming midi notes (played live via external source) are arpeggiated in accordance with chosen pattern over chosen number of octaves.
  - the arp engine's notestack can hold a maximum of 10 notes (cos 8 fingers, 2 thumbs). Once full, oldest note shuffles off the pile to make way for newest note.
  - On Pattern Edit view, param +/- cycles thru number of octaves (1-4)
- 
- In ARP mode with SHIFT toggled off...
+ ...with SHIFT toggled off...
  - On Pattern Edit view, param +/- cycles thru patterns (1-7)
 
  Arp Patterns:
@@ -81,7 +80,7 @@ In CC or NOTE mode, Velocity pane allows step selection... and then:
  7 - Random - Notes are played randomly
 
  To LATCH the arpeggio, change selected track then let go of the keys.
- Currently latched arpeggio will remain latched until you return to arpeggio track, put it in shift mode - it is now armed unlatch when you hit the next note / chord and start a new arpeggio. The arpeggiator is clocked by the selected track's sequencer pattern, and respects all the layers (velocity / probability / gatelength) & any clock division.
+ Currently latched arpeggio will remain latched until you return to arpeggio track, put it in shift mode - it is now armed unlatch when you hit the next note / chord and start a new arpeggio. Each arpeggiator is clocked by the selected track's sequencer pattern, and respects all the layers (velocity / probability / gatelength) & any clock division. Each arpeggiator is independent, and can have it's own pattern and octave range.
 
 
 Outputs optional self-generated MIDI Clock (24 PPQN), Play/Stop/Reset (ideal for use in VCV rack with MIDI > CV module)

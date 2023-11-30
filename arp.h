@@ -74,12 +74,13 @@ class Arp {
   }
 
   uint8_t getOutsideInPatternPitch() {
-    std::vector<uint8_t> downPitches = pitches;
+    std::vector<uint8_t> downPitches = octpitches;
     std::sort(octpitches.begin(), octpitches.end());
     std::sort(downPitches.begin(), downPitches.end(), std::greater<uint8_t>());
     std::vector<uint8_t> outsideInPitches;
-    int length = octpitches.size() / 2 + 1; // the plus one helps odd numbers, but also isn't reached in even numbers
-    for (int i = 0; i < length; i++) {
+    uint8_t length = octpitches.size() / 2 + 1; // the plus one helps odd numbers, but also isn't reached in even numbers
+    outsideInPitches.reserve(length);
+    for (uint8_t  i = 0; i < length; ++i) {
       outsideInPitches.push_back(octpitches.at(i));
       outsideInPitches.push_back(downPitches.at(i));
     }
@@ -98,30 +99,37 @@ class Arp {
   void setPitchOut() {
     switch (this->_sequencePattern) {
       case 1: {
+        if (marci_debug) Serial.println("UP");
         this->_pitchOut = getUpPatternPitch();
         break;
       }
       case 2: {
+        if (marci_debug) Serial.println("DN");
         this->_pitchOut = getDownPatternPitch();
         break;
       }
       case 3: {
+        if (marci_debug) Serial.println("INC");
         this->_pitchOut = getInclusivePatternPitch();
         break;
       }
       case 4: {
+        if (marci_debug) Serial.println("EXC");
         this->_pitchOut = getExclusivePatternPitch();
         break;
       }
       case 5: {
+        if (marci_debug) Serial.println("OUTIN");
         this->_pitchOut = getOutsideInPatternPitch();
         break;
       }
       case 6: {
+        if (marci_debug) Serial.println("ORD");
         this->_pitchOut = getOrderPatternPitch();
         break;
       }
       case 7: {
+        if (marci_debug) Serial.println("RAN");
         this->_pitchOut = getRandomPatternPitch();
         break;
       }
@@ -141,6 +149,7 @@ class Arp {
   }
 
   void setStep(int nextStep, int numberOfPitches) {
+    if (marci_debug) Serial.println("setStep");
     this->_step = nextStep;
     this->_maxSteps = numberOfPitches;
 

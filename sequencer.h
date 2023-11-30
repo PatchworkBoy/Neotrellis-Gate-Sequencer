@@ -81,7 +81,7 @@ public:
   uint8_t ctrl_chan = 16;
   uint8_t laststep;
   uint8_t swing;
-  uint8_t arpn;
+  uint8_t arpn[4];
   bool mutes[numtracks];
   bool seqs[numpresets][numtracks][numsteps];
   bool pulse;
@@ -142,7 +142,21 @@ public:
         held_gate_millis[i] = 0;
         switch (modes[i]) {
           case ARP:
-            off_func(arpn, 0, 1, true, track_chan[i]);
+            switch (i){
+              case 4:
+                off_func(arpn[0], 0, 1, true, track_chan[i]);
+                break;
+              case 5:
+                off_func(arpn[1], 0, 1, true, track_chan[i]);
+                break;
+              case 6:
+                off_func(arpn[2], 0, 1, true, track_chan[i]);
+                break;
+              case 7:
+                off_func(arpn[3], 0, 1, true, track_chan[i]);
+                break;
+              default: break;
+            }
             break;
           case TRIGATE:
             off_func(track_notes[i] + transpose, 0, 1, true, track_chan[i]);
@@ -239,8 +253,26 @@ public:
         switch (modes[i]) {
           case ARP:
             if (seqs[presets[i]][i][multistepi[i]] == 1 && mutes[i] == 0 ? outcomes[i] : false) {
-              uint8_t n = arp.process(arppattern, arpoctave); // pattern (1-7), octaves(1-4)
-              arpn = n;
+              uint8_t n;
+              switch (i) {
+                case 4:
+                  n = arp1.process(arp1pattern, arp1octave); // pattern (1-7), octaves(1-4)
+                  arpn[0] = n;
+                  break;
+                case 5:
+                  n = arp2.process(arp2pattern, arp2octave); // pattern (1-7), octaves(1-4)
+                  arpn[1] = n;
+                  break;
+                case 6:
+                  n = arp3.process(arp3pattern, arp3octave); // pattern (1-7), octaves(1-4)
+                  arpn[2] = n;
+                  break;
+                case 7:
+                  n = arp4.process(arp4pattern, arp4octave); // pattern (1-7), octaves(1-4)
+                  arpn[3] = n;
+                  break;
+                default: break;
+              }
               if (n != 0) {
                 if (marci_debug) {
                   Serial.print("ArpNote: ");
@@ -343,7 +375,10 @@ public:
       divcounts[s] = -1;
     }
     stepi = -1;  // hmm, but goes to 0 on first downbeat
-    arp._step = -1;
+    arp1._step = -1;
+    arp2._step = -1;
+    arp3._step = -1;
+    arp4._step = -1;
     ticki = 0;
     playing = true;
     if (send_clock && !extclk_micros) {
@@ -388,7 +423,10 @@ public:
 
   void reset() {
     stepi = -1;
-    arp._step = -1;
+    arp1._step = -1;
+    arp2._step = -1;
+    arp3._step = -1;
+    arp4._step = -1;
     for (uint8_t s = 0; s <= 7; s++) {
       multistepi[s] = -1;
       divcounts[s] = -1;

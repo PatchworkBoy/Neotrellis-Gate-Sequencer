@@ -33,7 +33,7 @@
 // Serial Console logging...
 const bool midi_out_debug = false;
 const bool midi_in_debug = false;
-const bool marci_debug = false;
+const bool marci_debug = true;
 
 // HOW BIG IS YOUR TRELLIS?
 #define Y_DIM 8  //number of rows of key
@@ -71,6 +71,8 @@ uint8_t lastsel;
 uint8_t selstep;
 uint8_t shifted;  // (SHIFT)
 uint8_t transpose;
+byte arps[4];
+byte arpcount;
 bool hzv[2] = { 0, 0 };
 bool chanedit;
 bool divedit;
@@ -89,9 +91,18 @@ bool write;
 bool resetflag;
 
 #include "arp.h"
-byte arppattern = 1;
-byte arpoctave = 1;
-Arp<10> arp;
+byte arp1pattern = 1;
+byte arp1octave = 1;
+byte arp2pattern = 1;
+byte arp2octave = 1;
+byte arp3pattern = 1;
+byte arp3octave = 1;
+byte arp4pattern = 1;
+byte arp4octave = 1;
+Arp<10> arp1;
+Arp<10> arp2;
+Arp<10> arp3;
+Arp<10> arp4;
 
 #include "Sequencer.h"
 #include "save_locations.h"
@@ -196,7 +207,21 @@ void handle_midi_in_NoteOff(uint8_t channel, uint8_t note, uint8_t vel) {
     case ARP:
       if (marci_debug) Serial.println("Firing NoteOff to arp for");
       if (marci_debug) Serial.println(note);
-      arp.NoteOff(note);
+      switch (sel_track - 1){
+        case 4:
+          arp1.NoteOff(note);
+          break;
+        case 5:
+          arp2.NoteOff(note);
+          break;
+        case 6:
+          arp3.NoteOff(note);
+          break;
+        case 7:
+          arp4.NoteOff(note);
+          break;
+        default: break;
+      }
       break;
     default: break;
   }
@@ -269,7 +294,21 @@ void handle_midi_in_NoteOn(uint8_t channel, uint8_t note, uint8_t vel) {
           break;
         case 1:
           if (marci_debug) Serial.println("Sending to Arp");
-          arp.NoteOn(note);
+          switch (sel_track - 1){
+            case 4:
+              arp1.NoteOn(note);
+              break;
+            case 5:
+              arp2.NoteOn(note);
+              break;
+            case 6:
+              arp3.NoteOn(note);
+              break;
+            case 7:
+              arp4.NoteOn(note);
+              break;
+            default: break;
+          }
           break;
         default: break;
       }
@@ -520,7 +559,7 @@ void mode_leds(uint8_t track) {
       }
       break;
     case ARP:
-      trellis.setPixelColor(27, W100);
+      if (track - 1 >= 4) trellis.setPixelColor(27, W100);
       break;
     case CHORD:
       trellis.setPixelColor(28, W100);
@@ -561,10 +600,10 @@ void init_chan_conf(uint8_t track) {
       }
       break;
     case ARP:
-      trellis.setPixelColor(27, W100);
+      if (track - 1 >= 4) trellis.setPixelColor(27, W100);
       break;
     case CHORD:
-      trellis.setPixelColor(28, W100);
+      if (track - 1 >= 4) trellis.setPixelColor(28, W100);
       break;
     default: break;
   }
@@ -779,7 +818,9 @@ TrellisCallback onKey(keyEvent evt) {
               seqr.modes[sel_track - 1] = NOTE;
               break;
             case 27:
-              seqr.modes[sel_track-1] = ARP;
+              if (sel_track - 1 >= 4) {
+                seqr.modes[sel_track-1] = ARP;
+              }
               break;
             case 28:
               //seqr.modes[sel_track-1] = CHORD;
@@ -1383,10 +1424,36 @@ TrellisCallback onKey(keyEvent evt) {
             break;
           case 62: // PARAM -
             if (seqr.modes[trk_arr] == ARP && patedit == 1) {
-              if (shifted == 0) {
-                arppattern = arppattern > 1 ? arppattern - 1 : 7;
-              } else if (shifted == 1) {
-                arpoctave = arpoctave > 1 ? arpoctave - 1 : 4;
+              switch(trk_arr){
+                case 4:
+                  if (shifted == 0) {
+                    arp1pattern = arp1pattern > 1 ? arp1pattern - 1 : 7;
+                  } else if (shifted == 1) {
+                    arp1octave = arp1octave > 1 ? arp1octave - 1 : 4;
+                  }
+                  break;
+                case 5:
+                  if (shifted == 0) {
+                    arp2pattern = arp2pattern > 1 ? arp2pattern - 1 : 7;
+                  } else if (shifted == 1) {
+                    arp2octave = arp2octave > 1 ? arp2octave - 1 : 4;
+                  }
+                  break;
+                case 6:
+                  if (shifted == 0) {
+                    arp3pattern = arp3pattern > 1 ? arp3pattern - 1 : 7;
+                  } else if (shifted == 1) {
+                    arp3octave = arp3octave > 1 ? arp3octave - 1 : 4;
+                  }
+                  break;
+                case 7:
+                  if (shifted == 0) {
+                    arp4pattern = arp4pattern > 1 ? arp4pattern - 1 : 7;
+                  } else if (shifted == 1) {
+                    arp4octave = arp4octave > 1 ? arp4octave - 1 : 4;
+                  }
+                  break;
+                default: break;
               }
             } else if (chanedit == 1) {
               brightness = brightness > 15 ? brightness - 10 : 5;
@@ -1425,10 +1492,36 @@ TrellisCallback onKey(keyEvent evt) {
             break;
           case 63: // PARAM +
             if (seqr.modes[trk_arr] == ARP && patedit == 1) {
-              if (shifted == 0) {
-                arppattern = arppattern < 7 ? arppattern + 1 : 1;
-              } else if (shifted == 1) {
-                arpoctave = arpoctave < 4 ? arpoctave + 1 : 4;
+              switch(trk_arr){
+                case 4:
+                  if (shifted == 0) {
+                    arp1pattern = arp1pattern < 7 ? arp1pattern + 1 : 1;
+                  } else if (shifted == 1) {
+                    arp1octave = arp1octave < 4 ? arp1octave + 1 : 1;
+                  }
+                  break;
+                case 5:
+                  if (shifted == 0) {
+                    arp2pattern = arp2pattern < 7 ? arp2pattern + 1 : 1;
+                  } else if (shifted == 1) {
+                    arp2octave = arp2octave < 4 ? arp2octave + 1 : 1;
+                  }
+                  break;
+                case 6:
+                  if (shifted == 0) {
+                    arp3pattern = arp3pattern < 7 ? arp3pattern + 1 : 1;
+                  } else if (shifted == 1) {
+                    arp3octave = arp3octave < 4 ? arp3octave + 1 : 1;
+                  }
+                  break;
+                case 7:
+                  if (shifted == 0) {
+                    arp4pattern = arp4pattern < 7 ? arp4pattern + 1 : 1;
+                  } else if (shifted == 1) {
+                    arp4octave = arp4octave < 4 ? arp4octave + 1 : 1;
+                  }
+                  break;
+                default: break;
               }
             } else if (chanedit == 1) {
               brightness = brightness < 117 ? brightness + 10 : 127;
