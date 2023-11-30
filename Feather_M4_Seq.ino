@@ -33,7 +33,7 @@
 // Serial Console logging...
 const bool midi_out_debug = false;
 const bool midi_in_debug = false;
-const bool marci_debug = true;
+const bool marci_debug = false;
 
 // HOW BIG IS YOUR TRELLIS?
 #define Y_DIM 8  //number of rows of key

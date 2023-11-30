@@ -106,3 +106,7 @@ Each track is transposable to set custom note (CC number in CC mode). Each track
 Octave button globally shifts ALL track notes up +1ve or +2ve ON TOP of any existing per-track transposition.
 
 FAR from perfect. Open to improvements - throw me a pull request.
+
+TO DO:
+- CHORD mode
+- Song mode
