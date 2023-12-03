@@ -1,23 +1,26 @@
 # Neotrellis MIDI & Analogue CV/Gate Sequencer
 [![YouTube Demo Video](http://img.youtube.com/vi/L5sNkB95-T4/0.jpg)](http://www.youtube.com/watch?v=L5sNkB95-T4 "Demo Video")
 
-An 8 track 32 step MIDI (over USB) & Analog note/modulation/gate/trigger sequencer with multi-mode arpeggiators available on 4 tracks, 2 tracks of Analog CV (control voltage) Output and MIDI Clock Generator (with swing) for Feather M4 Express / Neotrellis 8x8, featuring per-step per-track per-pattern note & velocity & probability & gatelength & per-track clock division layers, performance mutes and per-track loop-length (both start and endpoint) control.
+Adapted from https://github.com/todbot/picostepseq/
+
+An 8 track 32 step MIDI (over USB) & Analog note/modulation/gate/trigger sequencer with multi-mode arpeggiators available on 4 tracks, 2 tracks of Analog CV (control voltage) Output and MIDI Clock Generator (with swing)...  featuring per-step per-track per-pattern note & velocity & probability & gatelength & per-track clock division layers, performance mutes and per-track loop-length (both start and endpoint) control.
 16 storable preset patterns per track (all layers stored). Customisable note-per-track (Trigger/Gate mode) and channel-per-track.
 Tracks 5 thru 8 can be assigned as arpeggiators for live arpeggiation of incoming MIDI notes / chords.
 
-3 octave CV (v/oct, switchable to 2 octave Hz/V) Output for track 7 & 8 on pins A0 & A1 when tracks in CC or NOTE.
+3 octave CV (v/oct, switchable to 2ish octave Hz/V) Output for track 7 & 8 on pins A0 & A1 when tracks in CC or NOTE.
 Track 1-8 Gates always output on digital io pins D4/5/6/9/10/11/12/13 (sending a 0-3.2v trigger/gate).
 
 Analog CV/Gate outputs are NOT regulated or protected in any way. Whack a 1k resistor between pin and 3.5mm TRS socket tip. Analog output is merely proof of concept. There's something squonky going on with the Feather M4's DACs (when used with my Neutron and K2) where they cannot hold an output voltage for long unless retriggered. Keep Release of your gates short, else you'll hear drift-down to 0v oddities.
 
-
-Adapted from https://github.com/todbot/picostepseq/
+If no need for analog output, set to false on line 35 (analog_feats).
+Likewise, if no need for Serial MIDI output because you haven't added a socket to the TX pin, serial output can be set to false on line 38 (serial_midi).
 
 Designed for use with the Adafruit 8x8 Neotrellis Feather M4 Kit, no additional hardware required - 
 - US:  https://www.adafruit.com/product/1929
 - UK: https://thepihut.com/products/adafruit-untztrument-open-source-8x8-grid-controller-kit-8x8-white-leds
 
-NeoTrellis Surface...
+
+#NeoTrellis Surface
 
 ![Neotrellis Keys](https://apatchworkboy.com/wp-content/uploads/2023/11/Screenshot-2023-11-12-at-00.12.05.png)
 
@@ -71,13 +74,13 @@ In CC or NOTE mode, Velocity pane allows step selection... and then:
  - On Pattern Edit view, param +/- cycles thru patterns (1-7)
 
  Arp Patterns:
- - 1 - Up - Notes are played from lowest to highest
- - 2 - Down - Notes are played from highest to lowest
- - 3 - Inclusive - Notes are played from lowest to highest, then highest to lowest; the bottom and top notes are played twice
- - 4 - Exclusive - Notes are played from lowest to highest, then highest to lowest; the bottom and top notes are played only once
- - 5 - Outside In - Notes are played lowest then highest, then second lowest and second highest, and so forth until they meet in the middle
- - 6 - Order - Notes are played in the order that they come in
- - 7 - Random - Notes are played randomly
+ 1 - Up - Notes are played from lowest to highest
+ 2 - Down - Notes are played from highest to lowest
+ 3 - Inclusive - Notes are played from lowest to highest, then highest to lowest; the bottom and top notes are played twice
+ 4 - Exclusive - Notes are played from lowest to highest, then highest to lowest; the bottom and top notes are played only once
+ 5 - Outside In - Notes are played lowest then highest, then second lowest and second highest, and so forth until they meet in the middle
+ 6 - Order - Notes are played in the order that they come in
+ 7 - Random - Notes are played randomly
 
  To LATCH the arpeggio, change selected track then let go of the keys.
  Currently latched arpeggio will remain latched until you return to arpeggio track, put it in shift mode - it is now armed unlatch when you hit the next note / chord and start a new arpeggio. Each arpeggiator is clocked by the selected track's sequencer pattern, and respects all the layers (velocity / probability / gatelength) & any clock division. Each arpeggiator is independent, and can have it's own pattern and octave range.
