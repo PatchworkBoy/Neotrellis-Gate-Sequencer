@@ -204,6 +204,9 @@ void handle_midi_in_NoteOff(uint8_t channel, uint8_t note, uint8_t vel) {
   uint8_t trk_arr = sel_track - 1;
   if (marci_debug) Serial.println("Note Stop");
   if (seqr.mutes[trk_arr] == 1) {
+    if (seqr.modes[trk_arr] == TRIGATE) {
+      note = seqr.track_notes[trk_arr];
+    }
     if (serial_midi) serialmidi.sendNoteOff(note, vel, seqr.track_chan[trk_arr]);
     MIDIusb.sendNoteOff(note, vel, seqr.track_chan[trk_arr]);
   } else {
