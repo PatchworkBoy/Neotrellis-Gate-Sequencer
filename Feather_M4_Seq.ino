@@ -26,14 +26,20 @@
 #include <Adafruit_NeoTrellis.h>
 #include <MIDI.h>
 #include <ArduinoJson.h>
-#include "flash_config.h"
 #include <algorithm>
 #include <vector>
+#include "wiring_digital.h"
+#include "flash_config.h"
 
 // Serial Console logging...
 const bool midi_out_debug = false;
 const bool midi_in_debug = false;
 const bool marci_debug = false;
+
+// If you've wired TRS/DIN to TX pin then set to true:
+const bool serial_midi = false;
+// If you've wired TRS sockets & resistors to gatepins & DACs (see ln 74 & 75), set to true:
+const bool analog_feats = false;
 
 // HOW BIG IS YOUR TRELLIS?
 #define Y_DIM 8  //number of rows of key
@@ -49,6 +55,8 @@ Adafruit_NeoTrellis t_array[Y_DIM / 4][X_DIM / 4] = {
 Adafruit_MultiTrellis trellis((Adafruit_NeoTrellis*)t_array, Y_DIM / 4, X_DIM / 4);
 
 MIDI_CREATE_INSTANCE(Adafruit_USBD_MIDI, usb_midi, MIDIusb);  // USB MIDI
+MIDI_CREATE_INSTANCE(HardwareSerial, Serial1, serialmidi);  // Serial MIDI
+
 FatVolume fatfs;
 
 #define D_FLASH "/M4SEQ32"
@@ -59,20 +67,19 @@ FatVolume fatfs;
 #include "color_defs.h"
 
 const uint8_t numtracks = X_DIM;
-const uint8_t numsteps = t_size / 2;
+const uint8_t num_steps = t_size / 2;
 const uint8_t numpresets = X_DIM * 2;
 const uint16_t dacrange = 4095;  // A0 & A1 = 12bit DAC on Feather M4 Express
+const byte numdacs = 2;
 const byte cvpins[2] = { 14, 15 };
 const byte gatepins[numtracks] = { 4, 5, 6, 9, 10, 11, 12, 13 };
-uint8_t length = t_size / 2;  // same as numsteps at boot!
+uint8_t length = t_size / 2;  // same as num_steps at boot!
 uint8_t brightness = 50;
 uint8_t sel_track;
 uint8_t lastsel;
 uint8_t selstep;
 uint8_t shifted;  // (SHIFT)
 uint8_t transpose;
-byte arps[4];
-byte arpcount;
 bool hzv[2] = { 0, 0 };
 bool chanedit;
 bool divedit;
@@ -90,21 +97,7 @@ bool veledit;
 bool write;
 bool resetflag;
 
-#include "arp.h"
-byte arp1pattern = 1;
-byte arp1octave = 1;
-byte arp2pattern = 1;
-byte arp2octave = 1;
-byte arp3pattern = 1;
-byte arp3octave = 1;
-byte arp4pattern = 1;
-byte arp4octave = 1;
-Arp<10> arp1;
-Arp<10> arp2;
-Arp<10> arp3;
-Arp<10> arp4;
-
-#include "Sequencer.h"
+#include "multisequencer.h"
 #include "save_locations.h"
 
 typedef struct {
@@ -120,7 +113,7 @@ Config cfg = {
 };
 
 float tempo = 120;
-StepSequencer seqr;
+MultiStepSequencer<numtracks, numpresets, num_steps, numdacs, numarps> seqr;
 
 // end hardware definitions
 uint8_t midiclk_cnt = 0;
@@ -129,10 +122,17 @@ uint32_t midiclk_last_micros = 0;
 //
 // -- MIDI sending & receiving functions
 //
+// callback used by Sequencer to send song position in beats since start
+void send_song_pos(int beat) {
+  MIDIusb.sendSongPosition(beat);
+  if (serial_midi) serialmidi.sendSongPosition(beat);
+}
+
 // callback used by Sequencer to trigger note on
 void send_note_on(uint8_t note, uint8_t vel, uint8_t gate, bool on, uint8_t chan) {
   if (on) {
     MIDIusb.sendNoteOn(note, vel, chan);
+    if (serial_midi) serialmidi.sendNoteOn(note, vel, chan);
   }
   if (midi_out_debug) { Serial.printf("noteOn:  %d %d %d %d\n", note, vel, gate, on); }
 }
@@ -141,6 +141,7 @@ void send_note_on(uint8_t note, uint8_t vel, uint8_t gate, bool on, uint8_t chan
 void send_note_off(uint8_t note, uint8_t vel, uint8_t gate, bool on, uint8_t chan) {
   if (on) {
     MIDIusb.sendNoteOff(note, vel, chan);
+    if (serial_midi) serialmidi.sendNoteOff(note, vel, chan);
   }
   if (midi_out_debug) { Serial.printf("noteOff: %d %d %d %d\n", note, vel, gate, on); }
 }
@@ -149,6 +150,7 @@ void send_note_off(uint8_t note, uint8_t vel, uint8_t gate, bool on, uint8_t cha
 void send_cc(uint8_t cc, uint8_t val, bool on, uint8_t chan) {
   if (on) {
     MIDIusb.sendControlChange(cc, val, chan);
+    if (serial_midi) serialmidi.sendControlChange(cc, val, chan);
   }
   if (midi_out_debug) { Serial.printf("controlChange: %d %d %d %d\n", cc, val, on, chan); }
 }
@@ -157,10 +159,13 @@ void send_cc(uint8_t cc, uint8_t val, bool on, uint8_t chan) {
 void send_clock_start_stop(clock_type_t type) {
   if (type == START) {
     MIDIusb.sendStart();
+    if (serial_midi) serialmidi.sendStart();
   } else if (type == STOP) {
     MIDIusb.sendStop();
+    if (serial_midi) serialmidi.sendStop();
   } else if (type == CLOCK) {
     MIDIusb.sendClock();
+    if (serial_midi) serialmidi.sendClock();
   }
   if (midi_out_debug) { Serial.printf("\tclk:%d\n", type); }
 }
@@ -196,142 +201,154 @@ void handle_midi_in_clock() {
 }
 
 void handle_midi_in_NoteOff(uint8_t channel, uint8_t note, uint8_t vel) {
-  if (marci_debug)  Serial.println("Note Stop");
-  switch (seqr.modes[sel_track - 1]) {
-    case TRIGATE:
-      MIDIusb.sendNoteOff(seqr.track_notes[sel_track - 1], vel, seqr.track_chan[sel_track - 1]);
-      break;
-    case NOTE:
-      MIDIusb.sendNoteOff(note, vel, seqr.track_chan[sel_track - 1]);
-      break;
-    case ARP:
-      if (marci_debug) Serial.println("Firing NoteOff to arp for");
-      if (marci_debug) Serial.println(note);
-      switch (sel_track - 1){
-        case 4:
-          arp1.NoteOff(note);
-          break;
-        case 5:
-          arp2.NoteOff(note);
-          break;
-        case 6:
-          arp3.NoteOff(note);
-          break;
-        case 7:
-          arp4.NoteOff(note);
-          break;
-        default: break;
-      }
-      break;
-    default: break;
+  uint8_t trk_arr = sel_track - 1;
+  if (marci_debug) Serial.println("Note Stop");
+  if (seqr.mutes[trk_arr] == 1) {
+    if (serial_midi) serialmidi.sendNoteOff(note, vel, seqr.track_chan[trk_arr]);
+    MIDIusb.sendNoteOff(note, vel, seqr.track_chan[trk_arr]);
+  } else {
+    switch (seqr.modes[trk_arr]) {
+      case TRIGATE:
+        MIDIusb.sendNoteOff(seqr.track_notes[trk_arr], vel, seqr.track_chan[trk_arr]);
+        if (serial_midi) serialmidi.sendNoteOff(seqr.track_notes[trk_arr], vel, seqr.track_chan[trk_arr]);
+        break;
+      case NOTE:
+        MIDIusb.sendNoteOff(note, vel, seqr.track_chan[trk_arr]);
+        if (serial_midi) serialmidi.sendNoteOff(note, vel, seqr.track_chan[trk_arr]);
+        break;
+      case ARP:
+        if (marci_debug) Serial.println("Firing NoteOff to arp for");
+        if (marci_debug) Serial.println(note);
+        arps[trk_arr - numarps].NoteOff(note);
+        break;
+      default: break;
+    }
   }
 }
 
 void handle_midi_in_NoteOn(uint8_t channel, uint8_t note, uint8_t vel) {
   if (marci_debug) Serial.println("Note Start");
-  switch (seqr.modes[sel_track - 1]) {
-    case CC:
-      if (marci_debug) Serial.println("CC");
-      if (veledit == 1) {
-        switch (shifted) {
-          case 0:
-            seqr.vels[seqr.presets[sel_track - 1]][sel_track - 1][selstep] = note;
-            seqr.seqs[seqr.presets[sel_track - 1]][sel_track - 1][selstep] = 1;
-            break;
-          case 1:
-            // LIVE ENTRY
-            seqr.vels[seqr.presets[sel_track - 1]][sel_track - 1][seqr.multistepi[sel_track - 1]] = note;
-            seqr.seqs[seqr.presets[sel_track - 1]][sel_track - 1][seqr.multistepi[sel_track - 1]] = 1;
-            break;
-          default: break;
-        }
-      }
-      break;
-    case NOTE:
-      if (marci_debug) Serial.println("Note");
-      if (veledit == 1) {
-        switch (shifted) {
-          case 0:
-            send_note_off(seqr.notes[seqr.presets[sel_track - 1]][sel_track - 1][selstep], 0, 0, 1, seqr.track_chan[sel_track - 1]);
-            seqr.notes[seqr.presets[sel_track - 1]][sel_track - 1][selstep] = note;
-            seqr.vels[seqr.presets[sel_track - 1]][sel_track - 1][selstep] = vel;
-            seqr.seqs[seqr.presets[sel_track - 1]][sel_track - 1][selstep] = 1;
-            break;
-          case 1:
-            // LIVE ENTRY
-            send_note_off(seqr.notes[seqr.presets[sel_track - 1]][sel_track - 1][seqr.multistepi[sel_track - 1]], 0, 0, 1, seqr.track_chan[sel_track - 1]);
-            seqr.notes[seqr.presets[sel_track - 1]][sel_track - 1][seqr.multistepi[sel_track - 1]] = note;
-            seqr.vels[seqr.presets[sel_track - 1]][sel_track - 1][seqr.multistepi[sel_track - 1]] = vel;
-            seqr.seqs[seqr.presets[sel_track - 1]][sel_track - 1][seqr.multistepi[sel_track - 1]] = 1;
-            MIDIusb.sendNoteOn(note, vel, seqr.track_chan[sel_track - 1]);
-            break;
-          default: break;
-        }
-      }
-      break;
-    case TRIGATE:
-      if (marci_debug) Serial.println("Trigate");
-      switch (shifted) {
-        case 0:
-          seqr.vels[seqr.presets[sel_track - 1]][sel_track - 1][selstep] = note;
-          seqr.seqs[seqr.presets[sel_track - 1]][sel_track - 1][selstep] = 1;
-          break;
-        case 1:
-          // LIVE ENTRY
-          seqr.vels[seqr.presets[sel_track - 1]][sel_track - 1][seqr.multistepi[sel_track - 1]] = note;
-          seqr.seqs[seqr.presets[sel_track - 1]][sel_track - 1][seqr.multistepi[sel_track - 1]] = 1;
-          MIDIusb.sendNoteOn(seqr.track_notes[sel_track - 1], vel, seqr.track_chan[sel_track - 1]);
-          trellis.setPixelColor(seqr.multistepi[sel_track - 1], W100);
-          break;
-        default: break;
-      }
-      break;
-    case ARP: {
-      if (marci_debug) Serial.println("Arp");
-      switch (shifted) {
-        case 0:
-          if (marci_debug) Serial.println("Unshifted - ignore");
-          break;
-        case 1:
-          if (marci_debug) Serial.println("Sending to Arp");
-          switch (sel_track - 1){
-            case 4:
-              arp1.NoteOn(note);
+  uint8_t trk_arr = sel_track - 1;
+  if (seqr.mutes[trk_arr] == 1) {
+    if (seqr.modes[trk_arr] == TRIGATE) {
+      note = seqr.track_notes[trk_arr];
+    }
+    if (serial_midi) serialmidi.sendNoteOn(note, vel, seqr.track_chan[trk_arr]);
+    MIDIusb.sendNoteOn(note, vel, seqr.track_chan[trk_arr]);
+  } else {
+    uint8_t _s = constrain(seqr.ticki > 3 ? seqr.multistepi[trk_arr] + 1 : seqr.multistepi[trk_arr], 0 , num_steps - 1);
+    switch (seqr.modes[trk_arr]) {
+      case CC:
+        if (marci_debug) Serial.println("CC");
+        if (veledit == 1) {
+          switch (shifted) {
+            case 0:
+              seqr.vels[seqr.presets[trk_arr]][trk_arr][selstep] = note;
+              seqr.seqs[seqr.presets[trk_arr]][trk_arr][selstep] = 1;
               break;
-            case 5:
-              arp2.NoteOn(note);
-              break;
-            case 6:
-              arp3.NoteOn(note);
-              break;
-            case 7:
-              arp4.NoteOn(note);
+            case 1:
+              // LIVE ENTRY
+              seqr.vels[seqr.presets[trk_arr]][trk_arr][_s] = note;
+              seqr.seqs[seqr.presets[trk_arr]][trk_arr][_s] = 1;
               break;
             default: break;
           }
-          break;
-        default: break;
+        }
+        break;
+      case NOTE:
+        if (marci_debug) Serial.println("Note");
+        if (veledit == 1 || patedit == 1) {
+          switch (shifted) {
+            case 0:
+              send_note_off(seqr.notes[seqr.presets[trk_arr]][trk_arr][selstep], 0, 0, 1, seqr.track_chan[trk_arr]);
+              seqr.notes[seqr.presets[trk_arr]][trk_arr][selstep] = note;
+              seqr.vels[seqr.presets[trk_arr]][trk_arr][selstep] = vel;
+              seqr.seqs[seqr.presets[trk_arr]][trk_arr][selstep] = 1;
+              break;
+            case 1:
+              // LIVE ENTRY
+              send_note_off(seqr.notes[seqr.presets[trk_arr]][trk_arr][_s], 0, 0, 1, seqr.track_chan[trk_arr]);
+              MIDIusb.sendNoteOn(note, vel, seqr.track_chan[trk_arr]);
+              if (serial_midi) serialmidi.sendNoteOn(note, vel, seqr.track_chan[trk_arr]);
+              seqr.notes[seqr.presets[trk_arr]][trk_arr][_s] = note;
+              seqr.vels[seqr.presets[trk_arr]][trk_arr][_s] = vel;
+              seqr.seqs[seqr.presets[trk_arr]][trk_arr][_s] = 1;
+              break;
+            default: break;
+          }
+        }
+        break;
+      case TRIGATE:
+        if (marci_debug) Serial.println("Trigate");
+        switch (shifted) {
+          case 0:
+            seqr.vels[seqr.presets[trk_arr]][trk_arr][selstep] = note;
+            seqr.seqs[seqr.presets[trk_arr]][trk_arr][selstep] = 1;
+            break;
+          case 1:
+            // LIVE ENTRY
+            MIDIusb.sendNoteOn(seqr.track_notes[trk_arr], vel, seqr.track_chan[trk_arr]);
+            if (serial_midi) serialmidi.sendNoteOn(seqr.track_notes[trk_arr], vel, seqr.track_chan[trk_arr]);
+            seqr.vels[seqr.presets[trk_arr]][trk_arr][_s] = note;
+            seqr.seqs[seqr.presets[trk_arr]][trk_arr][_s] = 1;
+            trellis.setPixelColor(_s, W100);
+            break;
+          default: break;
+        }
+        break;
+      case ARP: {
+        if (marci_debug) Serial.println("Arp");
+        switch (shifted) {
+          case 0:
+            if (marci_debug) Serial.println("Unshifted - ignore");
+            break;
+          case 1:
+            if (marci_debug) Serial.println("Sending to Arp");
+              arps[trk_arr - numarps].NoteOn(note);
+            break;
+          default: break;
+        }
+        break;
+      default: break;
       }
-      break;
-    default: break;
     }
   }
 }
 
 void handle_midi_in_CC(uint8_t channel, uint8_t cc, uint8_t val) {
   Serial.println("CC Incoming");
-  switch (seqr.modes[sel_track - 1]) {
-    case CC:
-      seqr.vels[seqr.presets[sel_track - 1]][sel_track - 1][selstep] = val;
-      // LIVE ENTRY
-      // seqr.vels[seqr.presets[sel_track - 1]][sel_track - 1][seqr.multistepi[sel_track - 1]] = val;
-      break;
-    case NOTE:
-      seqr.notes[seqr.presets[sel_track - 1]][sel_track - 1][selstep] = val;
-      // LIVE ENTRY
-      // seqr.notes[seqr.presets[sel_track - 1]][sel_track - 1][seqr.multistepi[sel_track - 1]] = val;
-      break;
-    default: break;
+  uint8_t trk_arr = sel_track - 1;
+  if (seqr.mutes[trk_arr] == 1) {
+    if (serial_midi) serialmidi.sendControlChange(cc, val, seqr.track_chan[trk_arr]);
+    MIDIusb.sendControlChange(cc, val, seqr.track_chan[trk_arr]);
+  } else {
+    switch (seqr.modes[trk_arr]) {
+      case CC:
+        switch (shifted) {
+          case 0:
+            seqr.track_notes[trk_arr] = cc;
+            seqr.vels[seqr.presets[trk_arr]][trk_arr][selstep] = val;
+            break;
+          case 1:
+            seqr.track_notes[trk_arr] = cc;
+            seqr.vels[seqr.presets[trk_arr]][trk_arr][seqr.multistepi[trk_arr]] = val;
+            break;
+          default: break;
+        }
+        break;
+      case NOTE:
+        switch (shifted) {
+          case 0:
+            seqr.vels[seqr.presets[trk_arr]][trk_arr][selstep] = val;
+            break;
+          case 1:
+            seqr.vels[seqr.presets[trk_arr]][trk_arr][seqr.multistepi[trk_arr]] = val;
+            break;
+          default: break;
+        }
+        break;
+      default: break;
+    }
   }
 }
 
@@ -352,6 +369,15 @@ void midi_read_and_forward() {
       default: break;
     }
   }
+}
+
+// Analog IO
+void analog_gate(uint8_t pin, uint8_t direction) {
+  if (analog_feats) digitalWrite(pin, direction == 1 ? HIGH : LOW);
+}
+
+void analog_cv(uint8_t pin, uint16_t value) {
+  if (analog_feats) analogWrite(pin, value);
 }
 
 void update_display() {
@@ -395,7 +421,21 @@ void update_display() {
     trellis.setPixelColor(seqr.laststeps[trk_arr], color);
   }
   if (seqr.offsets[trk_arr] - 1 > 0) trellis.setPixelColor(seqr.offsets[trk_arr] - 1, trk_arr > 1 ? R127 : B127);
-  if (seqr.lengths[trk_arr] < numsteps) trellis.setPixelColor(seqr.lengths[trk_arr] - 1, trk_arr != 4 ? C127 : G127);
+  if (seqr.lengths[trk_arr] < num_steps) trellis.setPixelColor(seqr.lengths[trk_arr] - 1, trk_arr != 4 ? C127 : G127);
+
+  if (seqr.resetflag == 1) {
+    if (gateedit == 1) {
+      show_gates(sel_track);
+    } else if (veledit == 1) {
+      show_accents(sel_track);
+    } else if (probedit == 1) {
+      show_probabilities(sel_track);
+    } else {
+      show_sequence(sel_track);
+    }
+    seqr.resetflag = 0;
+  }
+
   trellis.show();
   strip.show();
 }
@@ -417,11 +457,10 @@ void reset_display() {
   trellis.setPixelColor(seqr.multistepi[trk_arr], hit);
   strip.setPixelColor(0, seq_col(sel_track));
   strip.show();
-  show_sequence(sel_track);
 }
 
 void toggle_selected(uint8_t keyId) {
-  trellis.setPixelColor(lastsel + (numsteps - 1), seq_dim(lastsel, 40));
+  trellis.setPixelColor(lastsel + (num_steps - 1), seq_dim(lastsel, 40));
   trellis.setPixelColor(keyId, seq_col(sel_track));
   if (!seqr.playing) {
     strip.setPixelColor(0, seq_col(sel_track));
@@ -431,7 +470,7 @@ void toggle_selected(uint8_t keyId) {
 
 void show_sequence(uint8_t seq) {
   patedit = 1;
-  for (uint8_t i = 0; i < numsteps; ++i) {
+  for (uint8_t i = 0; i < num_steps; ++i) {
     trellis.setPixelColor(i, seqr.seqs[seqr.presets[seq - 1]][seq - 1][i] > 0 ? seq_col(sel_track) : 0);
   }
   if (!seqr.playing) { trellis.show(); }
@@ -447,7 +486,7 @@ void show_gates(uint8_t seq) {
   gateedit = 1;
   uint8_t gateId = seq - 1;
   uint32_t col = 0;
-  for (uint8_t i = 0; i < numsteps; ++i) {
+  for (uint8_t i = 0; i < num_steps; ++i) {
     set_gate(gateId, i, seq_col(seq));
   }
   if (!seqr.playing) { trellis.show(); }
@@ -456,7 +495,7 @@ void show_gates(uint8_t seq) {
 void show_probabilities(uint8_t seq) {
   probedit = 1;
   uint32_t col = 0;
-  for (uint8_t i = 0; i < numsteps; ++i) {
+  for (uint8_t i = 0; i < num_steps; ++i) {
     col = seqr.probs[seqr.presets[seq - 1]][seq - 1][i] == 10 ? seq_col(seq) : Wheel(seqr.probs[seqr.presets[seq - 1]][seq - 1][i] * 10);
     trellis.setPixelColor(i, col);
   }
@@ -464,48 +503,52 @@ void show_probabilities(uint8_t seq) {
 }
 
 void show_accents(uint8_t seq) { // velocities
+  uint8_t trk_arr = sel_track - 1;
   veledit = 1;
   uint32_t col = 0;
   if (seqr.modes[seq - 1] == CC) {
-    for (uint8_t i = 0; i < numsteps; ++i) {
-      trellis.setPixelColor(i, Wheel(seqr.vels[seqr.presets[sel_track - 1]][seq - 1][i]));
+    for (uint8_t i = 0; i < num_steps; ++i) {
+      trellis.setPixelColor(i, Wheel(seqr.vels[seqr.presets[trk_arr]][seq - 1][i]));
     }
   } else {
-    for (uint8_t i = 0; i < numsteps; ++i) {
-      trellis.setPixelColor(i, seq_dim(seq, seqr.vels[seqr.presets[sel_track - 1]][seq - 1][i]));
+    for (uint8_t i = 0; i < num_steps; ++i) {
+      trellis.setPixelColor(i, seq_dim(seq, seqr.vels[seqr.presets[trk_arr]][seq - 1][i]));
     }
   }
   if (!seqr.playing) { trellis.show(); }
 }
 
 void show_notes(uint8_t seq) {
+  uint8_t trk_arr = sel_track - 1;
   notesedit = 1;
   uint32_t col = 0;
   if (seqr.modes[seq - 1] == NOTE) {
-    for (uint8_t i = 0; i < numsteps; ++i) {
-      trellis.setPixelColor(i, Wheel(seqr.notes[seqr.presets[sel_track - 1]][seq - 1][i]));
+    for (uint8_t i = 0; i < num_steps; ++i) {
+      trellis.setPixelColor(i, Wheel(seqr.notes[seqr.presets[trk_arr]][seq - 1][i]));
     }
   } else {
-    for (uint8_t i = 0; i < numsteps; ++i) {
-      trellis.setPixelColor(i, seq_dim(seq, seqr.notes[seqr.presets[sel_track - 1]][seq - 1][i]));
+    for (uint8_t i = 0; i < num_steps; ++i) {
+      trellis.setPixelColor(i, seq_dim(seq, seqr.notes[seqr.presets[trk_arr]][seq - 1][i]));
     }
   }
   if (!seqr.playing) { trellis.show(); }
 }
 
 void show_presets() {
-  for (uint8_t i = 0; i < numsteps; ++i) {
-    trellis.setPixelColor(i, i < (numsteps / 2) ? 0 : W10);
+  uint8_t trk_arr = sel_track - 1;
+  for (uint8_t i = 0; i < num_steps; ++i) {
+    trellis.setPixelColor(i, i < (num_steps / 2) ? 0 : W10);
   }
-  trellis.setPixelColor(seqr.presets[sel_track - 1], W100);
+  trellis.setPixelColor(seqr.presets[trk_arr], W100);
   trellis.show();
 }
 
 void show_divisions() {
-  for (uint8_t i = 0; i < numsteps; ++i) {
+  uint8_t trk_arr = sel_track - 1;
+  for (uint8_t i = 0; i < num_steps; ++i) {
     trellis.setPixelColor(i, 0);
   }
-  trellis.setPixelColor(seqr.divs[sel_track - 1], seq_col(sel_track));
+  trellis.setPixelColor(seqr.divs[trk_arr], seq_col(sel_track));
   trellis.setPixelColor(53, O80);
   trellis.setPixelColor(52, W100);
   trellis.show();
@@ -531,7 +574,7 @@ void transpose_led() {
 
 // Update Channel Config MODE buttons
 void mode_leds(uint8_t track) {
-  for (uint8_t i = X_DIM * 3; i < numsteps; ++i) {
+  for (uint8_t i = X_DIM * 3; i < num_steps; ++i) {
     trellis.setPixelColor(i, 0);
   }
   switch (seqr.modes[track - 1]) {
@@ -571,7 +614,7 @@ void mode_leds(uint8_t track) {
 
 // Initialise Channel Config display...
 void init_chan_conf(uint8_t track) {
-  for (uint8_t i = 0; i < numsteps; ++i) {
+  for (uint8_t i = 0; i < num_steps; ++i) {
     trellis.setPixelColor(i, 0);
   }
   trellis.setPixelColor(seqr.track_chan[track - 1] - 1, seq_col(track));
@@ -731,6 +774,7 @@ TrellisCallback onKey(keyEvent evt) {
   auto const now = millis();
   auto const keyId = evt.bit.NUM;
   if (marci_debug) { Serial.println(keyId); }
+  uint8_t trk_arr = sel_track - 1;
   switch (evt.bit.EDGE) {
     case SEESAW_KEYPAD_EDGE_RISING:
       uint32_t col;
@@ -749,9 +793,9 @@ TrellisCallback onKey(keyEvent evt) {
           break;
         }
       } else if (divedit == 1) { // TRACK CLOCK DIVIDER STEP EDIT
-        if (keyId < (numsteps)) {
-          seqr.divs[sel_track - 1] = keyId;
-          seqr.divcounts[sel_track - 1] = -1;
+        if (keyId < (num_steps)) {
+          seqr.divs[trk_arr] = keyId;
+          seqr.divcounts[trk_arr] = -1;
           show_divisions();
         } else if (keyId == 52) {
           divedit = 0;
@@ -765,24 +809,24 @@ TrellisCallback onKey(keyEvent evt) {
           show_sequence(sel_track);
         } else if (keyId == 58) {
           seqr.reset();
-        } else if (keyId < 40 && keyId >= numsteps) {
+        } else if (keyId < 40 && keyId >= num_steps) {
           divedit = 1;
           lastsel = sel_track;
-          sel_track = keyId - (numsteps -1);
+          sel_track = keyId - (num_steps -1);
           toggle_selected(keyId);
           show_divisions();
         } 
-      } else if (presetmode == 1 && (keyId < numsteps || keyId > 39 && keyId < 56)) { // PRESET STEP EDIT
+      } else if (presetmode == 1 && (keyId < num_steps || keyId > 39 && keyId < 56)) { // PRESET STEP EDIT
         if (keyId < (numpresets)) {
           for (uint8_t i = 0; i < numpresets; ++i) {
             trellis.setPixelColor(i, 0);
           }
-          trellis.setPixelColor(seqr.presets[sel_track - 1], 0);
+          trellis.setPixelColor(seqr.presets[trk_arr], 0);
           trellis.setPixelColor(keyId, W100);
-          seqr.presets[sel_track - 1] = keyId;
+          seqr.presets[trk_arr] = keyId;
           // seqr.reset();
         } else if (keyId > ((numpresets - 1)) && keyId < (numpresets * 2)) {
-          trellis.setPixelColor(seqr.presets[sel_track - 1], 0);
+          trellis.setPixelColor(seqr.presets[trk_arr], 0);
           trellis.setPixelColor(keyId - (X_DIM * 2), W100);
           for (uint8_t i = 0; i < numpresets; ++i) {
             seqr.presets[i] = (keyId - (X_DIM * 2));
@@ -798,10 +842,10 @@ TrellisCallback onKey(keyEvent evt) {
           }
         }
         show_presets();
-      } else if (chanedit == 1 && keyId < numsteps) { // CHANNEL STEP EDIT
+      } else if (chanedit == 1 && keyId < num_steps) { // CHANNEL STEP EDIT
         if (keyId < 16) {
           uint8_t chan = keyId + 1;
-          seqr.track_chan[sel_track - 1] = chan;
+          seqr.track_chan[trk_arr] = chan;
           for (uint8_t i = 0; i < 16; ++i) {
             trellis.setPixelColor(i, 0);
           }
@@ -809,16 +853,16 @@ TrellisCallback onKey(keyEvent evt) {
         } else {
           switch (keyId) {
             case 24:
-              seqr.modes[sel_track - 1] = TRIGATE;
+              seqr.modes[trk_arr] = TRIGATE;
               break;
             case 25:
-              seqr.modes[sel_track - 1] = CC;
+              seqr.modes[trk_arr] = CC;
               break;
             case 26:
-              seqr.modes[sel_track - 1] = NOTE;
+              seqr.modes[trk_arr] = NOTE;
               break;
             case 27:
-              if (sel_track - 1 >= 4) {
+              if (trk_arr >= 4) {
                 seqr.modes[sel_track-1] = ARP;
               }
               break;
@@ -826,44 +870,42 @@ TrellisCallback onKey(keyEvent evt) {
               //seqr.modes[sel_track-1] = CHORD;
               break;
             case 31:
-              if ((seqr.modes[sel_track - 1] == CC || seqr.modes[sel_track - 1] == NOTE) && (sel_track - 1 > 5)) {
-                hzv[(sel_track - 1) - 6] = hzv[(sel_track - 1) - 6] == 0 ? 1 : 0;
+              if ((seqr.modes[trk_arr] == CC || seqr.modes[trk_arr] == NOTE) && (trk_arr > 5)) {
+                hzv[(trk_arr) - 6] = hzv[(trk_arr) - 6] == 0 ? 1 : 0;
               }
               break;
             default: break;
           }
           mode_leds(sel_track);
         }
-      } else if (chanedit == 1 && ((keyId > (numsteps - 1) + X_DIM && keyId < (numsteps) + X_DIM + 12) || (keyId > (numsteps) + X_DIM + 13 && keyId < (t_size - 2)))) {
+      } else if (chanedit == 1 && ((keyId > (num_steps - 1) + X_DIM && keyId < (num_steps) + X_DIM + 12) || (keyId > (num_steps) + X_DIM + 13 && keyId < (t_size - 2)))) {
         // do nothin'
-      } else if (lenedit == 1 && keyId < numsteps) { // LENGTH EDIT
-        if (keyId + 1 >= seqr.offsets[sel_track - 1]) {
-          seqr.lengths[sel_track - 1] = keyId + 1;
+      } else if (lenedit == 1 && keyId < num_steps) { // LENGTH EDIT
+        if (keyId + 1 >= seqr.offsets[trk_arr]) {
+          seqr.lengths[trk_arr] = keyId + 1;
           //length = keyId + 1;
           lenedit = 0;
           trellis.setPixelColor(keyId, C127);
           trellis.setPixelColor(54, G40);
           configure_sequencer();
         }
-      } else if (offedit == 1 && keyId < numsteps) { // OFFSET EDIT
-        if (keyId + 1 <= seqr.lengths[sel_track - 1]) {
-          seqr.offsets[sel_track - 1] = keyId + 1;
+      } else if (offedit == 1 && keyId < num_steps) { // OFFSET EDIT
+        if (keyId + 1 <= seqr.lengths[trk_arr]) {
+          seqr.offsets[trk_arr] = keyId + 1;
           //length = keyId + 1;
           offedit = 0;
           trellis.setPixelColor(keyId, B127);
           trellis.setPixelColor(54, B40);
           configure_sequencer();
         }
-      } else if (gateedit == 1 && keyId < numsteps) { // GATE STEP EDIT
-        uint8_t trk_arr = sel_track - 1;
+      } else if (gateedit == 1 && keyId < num_steps) { // GATE STEP EDIT
         uint8_t gateId = trk_arr;
         if (seqr.gates[seqr.presets[trk_arr]][gateId][keyId] >= 15) {
           seqr.gates[seqr.presets[trk_arr]][gateId][keyId] = 0;
         }
         seqr.gates[seqr.presets[trk_arr]][gateId][keyId] += 3;
         set_gate(gateId, keyId, seq_col(sel_track));
-      } else if (probedit == 1 && keyId < numsteps) { // PROBABILITY STEP EDIT
-        uint8_t trk_arr = sel_track - 1;
+      } else if (probedit == 1 && keyId < num_steps) { // PROBABILITY STEP EDIT
         if (seqr.probs[seqr.presets[trk_arr]][trk_arr][keyId] == 10) {
           seqr.probs[seqr.presets[trk_arr]][trk_arr][keyId] = 0;
         }
@@ -871,16 +913,14 @@ TrellisCallback onKey(keyEvent evt) {
         col = seqr.probs[seqr.presets[trk_arr]][trk_arr][keyId] == 10 ? seq_col(sel_track) : Wheel(seqr.probs[seqr.presets[trk_arr]][trk_arr][keyId] * 10);
         trellis.setPixelColor(keyId, col);
         if (!seqr.playing) { trellis.show(); }
-      } else if (notesedit == 1 & keyId < numsteps) { // NOTES STEP EDIT
-        uint8_t trk_arr = sel_track - 1;
+      } else if (notesedit == 1 & keyId < num_steps) { // NOTES STEP EDIT
         if (seqr.modes[trk_arr] == CC || seqr.modes[trk_arr] == NOTE) {
           uint8_t prev_selstep = selstep;
           selstep = keyId;
           trellis.setPixelColor(prev_selstep, Wheel(seqr.notes[seqr.presets[trk_arr]][trk_arr][prev_selstep]));
           trellis.setPixelColor(selstep, W100);
         }
-      } else if (veledit == 1 & keyId < numsteps) { // VELOCITY STEP EDIT
-        uint8_t trk_arr = sel_track - 1;
+      } else if (veledit == 1 & keyId < num_steps) { // VELOCITY STEP EDIT
         if (seqr.modes[trk_arr] == CC || seqr.modes[trk_arr] == NOTE) {
           uint8_t prev_selstep = selstep;
           selstep = keyId;
@@ -1038,8 +1078,7 @@ TrellisCallback onKey(keyEvent evt) {
               break;
           }
         }
-      } else if (keyId < numsteps) { // STEP EDIT
-        uint8_t trk_arr = sel_track - 1;
+      } else if (keyId < num_steps) { // STEP EDIT
         col = W10;
         switch (seqr.seqs[seqr.presets[trk_arr]][trk_arr][keyId]) {
           case 1:
@@ -1053,7 +1092,7 @@ TrellisCallback onKey(keyEvent evt) {
         trellis.setPixelColor(keyId, col);
       } else if (keyId < 40) { // SELECT TRACK 1 - 8
         lastsel = sel_track;
-        sel_track = keyId - (numsteps - 1);
+        sel_track = keyId - (num_steps - 1);
         toggle_selected(keyId);
         if (presetmode == 1) {
           show_presets();
@@ -1086,7 +1125,6 @@ TrellisCallback onKey(keyEvent evt) {
           show_sequence(sel_track);
         }
       } else {
-        uint8_t trk_arr = sel_track - 1;
         switch (keyId) {
           case 40: // MUTE 1
             if (seqr.mutes[0] == 0) {
@@ -1374,7 +1412,13 @@ TrellisCallback onKey(keyEvent evt) {
             if (chanedit == 0) { seqr.stop(); }
             break;
           case 58: // RESET
-            if (chanedit == 0) { resetflag = 1; }
+            if (chanedit == 0) { 
+              if (!seqr.playing) {
+                seqr.reset();
+              } else { 
+                seqr.resetflag = 1; 
+              }
+            }
             break;
           case 59: // WRITE
             if (chanedit == 0) {
@@ -1404,12 +1448,12 @@ TrellisCallback onKey(keyEvent evt) {
             if (swingedit == 1) {
               seqr.swing= 0;
             } else if (veledit == 1) {
-              for (uint8_t i = 0; i < numsteps; ++i) {
-                seqr.vels[seqr.presets[sel_track - 1]][sel_track - 1][i] = 72;
+              for (uint8_t i = 0; i < num_steps; ++i) {
+                seqr.vels[seqr.presets[trk_arr]][trk_arr][i] = 72;
               }
             } else if (notesedit == 1) {
-              for (uint8_t i = 0; i < numsteps; ++i) {
-                seqr.notes[seqr.presets[sel_track - 1]][sel_track - 1][i] = 0;
+              for (uint8_t i = 0; i < num_steps; ++i) {
+                seqr.notes[seqr.presets[trk_arr]][trk_arr][i] = 0;
               }
             } else {
               if (cfg.midi_send_clock == true) {
@@ -1424,66 +1468,41 @@ TrellisCallback onKey(keyEvent evt) {
             break;
           case 62: // PARAM -
             if (seqr.modes[trk_arr] == ARP && patedit == 1) {
-              switch(trk_arr){
-                case 4:
-                  if (shifted == 0) {
-                    arp1pattern = arp1pattern > 1 ? arp1pattern - 1 : 7;
-                  } else if (shifted == 1) {
-                    arp1octave = arp1octave > 1 ? arp1octave - 1 : 4;
-                  }
-                  break;
-                case 5:
-                  if (shifted == 0) {
-                    arp2pattern = arp2pattern > 1 ? arp2pattern - 1 : 7;
-                  } else if (shifted == 1) {
-                    arp2octave = arp2octave > 1 ? arp2octave - 1 : 4;
-                  }
-                  break;
-                case 6:
-                  if (shifted == 0) {
-                    arp3pattern = arp3pattern > 1 ? arp3pattern - 1 : 7;
-                  } else if (shifted == 1) {
-                    arp3octave = arp3octave > 1 ? arp3octave - 1 : 4;
-                  }
-                  break;
-                case 7:
-                  if (shifted == 0) {
-                    arp4pattern = arp4pattern > 1 ? arp4pattern - 1 : 7;
-                  } else if (shifted == 1) {
-                    arp4octave = arp4octave > 1 ? arp4octave - 1 : 4;
-                  }
-                  break;
-                default: break;
+              uint8_t arp_id = trk_arr - numarps;
+              if (shifted == 0) {
+                arp_patterns[arp_id] = arp_patterns[arp_id] > 1 ? arp_patterns[arp_id] - 1 : 7;
+              } else if (shifted == 1) {
+                arp_octaves[arp_id] = arp_octaves[arp_id] > 1 ? arp_octaves[arp_id] - 1 : 4;
               }
             } else if (chanedit == 1) {
               brightness = brightness > 15 ? brightness - 10 : 5;
               init_interface();
               init_chan_conf(sel_track);
             } else if (gateedit == 1 && swingedit == 0) {
-              for (uint8_t i = 0; i < numsteps; ++i) {
+              for (uint8_t i = 0; i < num_steps; ++i) {
                 seqr.gates[seqr.presets[trk_arr]][trk_arr][i] = seqr.gates[seqr.presets[trk_arr]][trk_arr][i] - 1 > 1 ? seqr.gates[seqr.presets[trk_arr]][trk_arr][i] - 1 : 1;
-                if (!seqr.playing) set_gate(sel_track - 1, i, seq_col(sel_track));
+                if (!seqr.playing) set_gate(trk_arr, i, seq_col(sel_track));
               }
               if (!seqr.playing) { trellis.show(); }
             } else if (shifted == 1 && swingedit == 0) {
-              seqr.track_notes[sel_track - 1] = seqr.track_notes[sel_track - 1] > 0 ? seqr.track_notes[sel_track - 1] - 1 : 127;
+              seqr.track_notes[trk_arr] = seqr.track_notes[trk_arr] > 0 ? seqr.track_notes[trk_arr] - 1 : 127;
             } else if (shifted == 1 && swingedit == 1) {
               seqr.swing= seqr.swing> 0 ? seqr.swing- 1 : 0;
             } else if (probedit == 1) {
-              for (uint8_t i = 0; i < numsteps; ++i) {
-                seqr.probs[seqr.presets[sel_track - 1]][sel_track - 1][i] = seqr.probs[seqr.presets[sel_track - 1]][sel_track - 1][i] > 1 ? seqr.probs[seqr.presets[sel_track - 1]][sel_track - 1][i] - 1 : 1;
+              for (uint8_t i = 0; i < num_steps; ++i) {
+                seqr.probs[seqr.presets[trk_arr]][trk_arr][i] = seqr.probs[seqr.presets[trk_arr]][trk_arr][i] > 1 ? seqr.probs[seqr.presets[trk_arr]][trk_arr][i] - 1 : 1;
               }
             } else if (veledit == 1) {
-              if (seqr.modes[sel_track - 1] == CC || seqr.modes[sel_track - 1] == NOTE) {
-                seqr.vels[seqr.presets[sel_track - 1]][sel_track - 1][selstep] = seqr.vels[seqr.presets[sel_track - 1]][sel_track - 1][selstep] > 5 ? seqr.vels[seqr.presets[sel_track - 1]][sel_track - 1][selstep] - 1 : 0;
+              if (seqr.modes[trk_arr] == CC || seqr.modes[trk_arr] == NOTE) {
+                seqr.vels[seqr.presets[trk_arr]][trk_arr][selstep] = seqr.vels[seqr.presets[trk_arr]][trk_arr][selstep] > 5 ? seqr.vels[seqr.presets[trk_arr]][trk_arr][selstep] - 1 : 0;
               } else {
-                for (uint8_t i = 0; i < numsteps; ++i) {
-                  seqr.vels[seqr.presets[sel_track - 1]][sel_track - 1][i] = seqr.vels[seqr.presets[sel_track - 1]][sel_track - 1][i] > 5 ? seqr.vels[seqr.presets[sel_track - 1]][sel_track - 1][i] - 5 : 0;
+                for (uint8_t i = 0; i < num_steps; ++i) {
+                  seqr.vels[seqr.presets[trk_arr]][trk_arr][i] = seqr.vels[seqr.presets[trk_arr]][trk_arr][i] > 5 ? seqr.vels[seqr.presets[trk_arr]][trk_arr][i] - 5 : 0;
                 }
               }
             } else if (notesedit == 1) {
-              if (seqr.modes[sel_track - 1] == CC || seqr.modes[sel_track - 1] == NOTE) {
-                seqr.notes[seqr.presets[sel_track - 1]][sel_track - 1][selstep] = seqr.notes[seqr.presets[sel_track - 1]][sel_track - 1][selstep] > 0 ? seqr.notes[seqr.presets[sel_track - 1]][sel_track - 1][selstep] - 1 : 0;
+              if (seqr.modes[trk_arr] == CC || seqr.modes[trk_arr] == NOTE) {
+                seqr.notes[seqr.presets[trk_arr]][trk_arr][selstep] = seqr.notes[seqr.presets[trk_arr]][trk_arr][selstep] > 0 ? seqr.notes[seqr.presets[trk_arr]][trk_arr][selstep] - 1 : 0;
               }
             } else {
               tempo = tempo - 1;
@@ -1492,66 +1511,41 @@ TrellisCallback onKey(keyEvent evt) {
             break;
           case 63: // PARAM +
             if (seqr.modes[trk_arr] == ARP && patedit == 1) {
-              switch(trk_arr){
-                case 4:
-                  if (shifted == 0) {
-                    arp1pattern = arp1pattern < 7 ? arp1pattern + 1 : 1;
-                  } else if (shifted == 1) {
-                    arp1octave = arp1octave < 4 ? arp1octave + 1 : 1;
-                  }
-                  break;
-                case 5:
-                  if (shifted == 0) {
-                    arp2pattern = arp2pattern < 7 ? arp2pattern + 1 : 1;
-                  } else if (shifted == 1) {
-                    arp2octave = arp2octave < 4 ? arp2octave + 1 : 1;
-                  }
-                  break;
-                case 6:
-                  if (shifted == 0) {
-                    arp3pattern = arp3pattern < 7 ? arp3pattern + 1 : 1;
-                  } else if (shifted == 1) {
-                    arp3octave = arp3octave < 4 ? arp3octave + 1 : 1;
-                  }
-                  break;
-                case 7:
-                  if (shifted == 0) {
-                    arp4pattern = arp4pattern < 7 ? arp4pattern + 1 : 1;
-                  } else if (shifted == 1) {
-                    arp4octave = arp4octave < 4 ? arp4octave + 1 : 1;
-                  }
-                  break;
-                default: break;
+              uint8_t arp_id = trk_arr - numarps;
+              if (shifted == 0) {
+                arp_patterns[arp_id] = arp_patterns[arp_id] < 7 ? arp_patterns[arp_id] + 1 : 1;
+              } else if (shifted == 1) {
+                arp_octaves[arp_id] = arp_octaves[arp_id] < 4 ? arp_octaves[arp_id] + 1 : 1;
               }
             } else if (chanedit == 1) {
               brightness = brightness < 117 ? brightness + 10 : 127;
               init_interface();
               init_chan_conf(sel_track);
             } else if (gateedit == 1 && swingedit == 0) {
-              for (uint8_t i = 0; i < numsteps; ++i) {
+              for (uint8_t i = 0; i < num_steps; ++i) {
                 seqr.gates[seqr.presets[trk_arr]][trk_arr][i] = seqr.gates[seqr.presets[trk_arr]][trk_arr][i] + 1 < 15 ? seqr.gates[seqr.presets[trk_arr]][trk_arr][i] + 1 : 15;
-                if (!seqr.playing) set_gate(sel_track - 1, i, seq_col(sel_track));
+                if (!seqr.playing) set_gate(trk_arr, i, seq_col(sel_track));
               }
               if (!seqr.playing) { trellis.show(); }
             } else if (shifted == 1 && swingedit == 0) {
-              seqr.track_notes[sel_track - 1] = seqr.track_notes[sel_track - 1] < 127 ? seqr.track_notes[sel_track - 1] + 1 : 1;
+              seqr.track_notes[trk_arr] = seqr.track_notes[trk_arr] < 127 ? seqr.track_notes[trk_arr] + 1 : 1;
             } else if (shifted == 1 && swingedit == 1) {
               seqr.swing= seqr.swing< 30 ? seqr.swing+ 1 : 30;
             } else if (probedit == 1) {
-              for (uint8_t i = 0; i < numsteps; ++i) {
-                seqr.probs[seqr.presets[sel_track - 1]][sel_track - 1][i] = seqr.probs[seqr.presets[sel_track - 1]][sel_track - 1][i] < 10 ? seqr.probs[seqr.presets[sel_track - 1]][sel_track - 1][i] + 1 : 10;
+              for (uint8_t i = 0; i < num_steps; ++i) {
+                seqr.probs[seqr.presets[trk_arr]][trk_arr][i] = seqr.probs[seqr.presets[trk_arr]][trk_arr][i] < 10 ? seqr.probs[seqr.presets[trk_arr]][trk_arr][i] + 1 : 10;
               }
             } else if (veledit == 1) {
-              if (seqr.modes[sel_track - 1] == CC || seqr.modes[sel_track - 1] == NOTE) {
-                seqr.vels[seqr.presets[sel_track - 1]][sel_track - 1][selstep] = seqr.vels[seqr.presets[sel_track - 1]][sel_track - 1][selstep] < 122 ? seqr.vels[seqr.presets[sel_track - 1]][sel_track - 1][selstep] + 1 : 127;
+              if (seqr.modes[trk_arr] == CC || seqr.modes[trk_arr] == NOTE) {
+                seqr.vels[seqr.presets[trk_arr]][trk_arr][selstep] = seqr.vels[seqr.presets[trk_arr]][trk_arr][selstep] < 122 ? seqr.vels[seqr.presets[trk_arr]][trk_arr][selstep] + 1 : 127;
               } else {
-                for (uint8_t i = 0; i < numsteps; ++i) {
-                  seqr.vels[seqr.presets[sel_track - 1]][sel_track - 1][i] = seqr.vels[seqr.presets[sel_track - 1]][sel_track - 1][i] < 122 ? seqr.vels[seqr.presets[sel_track - 1]][sel_track - 1][i] + 5 : 127;
+                for (uint8_t i = 0; i < num_steps; ++i) {
+                  seqr.vels[seqr.presets[trk_arr]][trk_arr][i] = seqr.vels[seqr.presets[trk_arr]][trk_arr][i] < 122 ? seqr.vels[seqr.presets[trk_arr]][trk_arr][i] + 5 : 127;
                 }
               }
             } else if (notesedit == 1) {
-              if (seqr.modes[sel_track - 1] == CC || seqr.modes[sel_track - 1] == NOTE) {
-                seqr.notes[seqr.presets[sel_track - 1]][sel_track - 1][selstep] = seqr.notes[seqr.presets[sel_track - 1]][sel_track - 1][selstep] < 127 ? seqr.notes[seqr.presets[sel_track - 1]][sel_track - 1][selstep] + 1 : 127;
+              if (seqr.modes[trk_arr] == CC || seqr.modes[trk_arr] == NOTE) {
+                seqr.notes[seqr.presets[trk_arr]][trk_arr][selstep] = seqr.notes[seqr.presets[trk_arr]][trk_arr][selstep] < 127 ? seqr.notes[seqr.presets[trk_arr]][trk_arr][selstep] + 1 : 127;
               }
             } else {
               tempo = tempo + 1;
@@ -1566,6 +1560,7 @@ TrellisCallback onKey(keyEvent evt) {
     case SEESAW_KEYPAD_EDGE_FALLING:
       break;
   }
+  if (!seqr.playing) trellis.show();
   return nullptr;
 }
 
@@ -1573,12 +1568,20 @@ void configure_sequencer() {
   if (marci_debug) Serial.println(F("Configuring sequencer"));
   seqr.set_tempo(tempo);
   seqr.ticks_per_step = cfg.step_size;
-  seqr.on_func = send_note_on;
-  seqr.off_func = send_note_off;
-  seqr.clk_func = send_clock_start_stop;
-  seqr.cc_func = send_cc;
-  seqr.disp_func = update_display;
-  seqr.reset_func = reset_display;
+  if (m4init == 0) {
+    seqr.on_func = send_note_on;
+    seqr.off_func = send_note_off;
+    seqr.clk_func = send_clock_start_stop;
+    seqr.pos_func = send_song_pos;
+    seqr.cc_func = send_cc;
+    seqr.disp_func = update_display;
+    seqr.reset_func = reset_display;
+    if (analog_feats) {
+      seqr.gate_func = analog_gate;
+      seqr.cv_func = analog_cv;
+      seqr.analog_io = analog_feats;
+    }
+  }
   seqr.send_clock = cfg.midi_send_clock;
   seqr.length = length;
   seqr.transpose = transpose;
@@ -1640,9 +1643,13 @@ void setup() {
   MIDIusb.setHandleControlChange(handle_midi_in_CC);
   MIDIusb.begin(MIDI_CHANNEL_OMNI);
   MIDIusb.turnThruOff();  // turn off echo
+  serialmidi.begin(MIDI_CHANNEL_OMNI);
+  serialmidi.turnThruOff();  // turn off echo
 
-  for (uint8_t i = 0; i < sizeof(gatepins); ++i) {
-    pinMode(gatepins[i], OUTPUT);  //digtal (gate) out
+  if (analog_feats) {
+    for (uint8_t i = 0; i < sizeof(gatepins); ++i) {
+      pinMode(gatepins[i], OUTPUT);  //digtal (gate) out
+    }
   }
 
   Serial.begin(115200);

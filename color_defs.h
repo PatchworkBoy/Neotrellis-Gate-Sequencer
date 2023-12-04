@@ -1,3 +1,11 @@
+/**
+ * color_defs.h -- NeoPixel color definitions for Multitrack Sequencer UI
+ * Part of https://github.com/PatchworkBoy/Neotrellis-Gate-Sequencer
+ * 04 Nov 2023 - @apatchworkboy / Marci
+ */
+#ifndef MULTI_SEQUENCER_COLOR_DEFS
+#define MULTI_SEQUENCER_COLOR_DEFS
+
 #define maincolor seesaw_NeoPixel::Color(0, 0, 5)
 #define RED seesaw_NeoPixel::Color(155, 10, 10)
 #define R40 seesaw_NeoPixel::Color(20, 5, 5)
@@ -119,3 +127,4 @@ uint32_t Wheel(byte WheelPos) {
   }
   return 0;
 }
+#endif

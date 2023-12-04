@@ -1,23 +1,15 @@
-#include <stdint.h>
 /**
- * arp.h -- Arpeggiator for Multitrack Sequencer (for Feather M4 Express)
+* arp.h -- Arpeggiator Engine for Multitrack Sequencer (for Feather M4 Express)
+ * Part of https://github.com/PatchworkBoy/Neotrellis-Gate-Sequencer
  * 04 Nov 2023 - @apatchworkboy / Marci, derived from & inspired by...
  * 26 Feb 2020 - @shampton https://gitlab.com/hampton-harmonics/hampton-harmonics-modules
  *
  */
 
-// contains(vector, val)
-template <typename T>
-bool contains(
-        const std::vector<T>& vecObj,
-        const T& element)
-{
-    auto it = std::find(
-                    vecObj.begin(),
-                    vecObj.end(),
-                    element) ;
-    return it != vecObj.end();
-}
+#ifndef MULTI_SEQUENCER_ARP
+#define MULTI_SEQUENCER_ARP
+
+#include <stdint.h>
 
 template<uint8_t capacity> // max 10, cos 10 fingers.
 class Arp {
@@ -243,3 +235,4 @@ class Arp {
     }
   }
 };
+#endif
