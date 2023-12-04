@@ -1,19 +1,6 @@
-/**
- * saveload.h -- Flash storage engine for Multitrack Sequencer (for Feather M4 Express)
- * Part of https://github.com/PatchworkBoy/Neotrellis-Gate-Sequencer
- * 04 Nov 2023 - @apatchworkboy / Marci
- * Based on https://github.com/todbot/picostepseq/
- * 28 Apr 2023 - @todbot / Tod Kurt
- * 15 Aug 2022 - @todbot / Tod Kurt
- */
-#ifndef MULTI_SEQUENCER_FLASH
-#define MULTI_SEQUENCER_FLASH
-
-#include "flash_config.h"
-Adafruit_SPIFlash flash(&flashTransport);
-FatVolume fatfs;
-
-#include "save_locations.h"
+//
+// --- sequence load / save functions
+//
 
 uint32_t last_sequence_write_millis = 0;
 // write all notes to "disk"
@@ -27,7 +14,7 @@ void notes_write() {
     DynamicJsonDocument doc(8192);  // assistant said 6144
     for (int j = 0; j < numtracks; j++) {
       JsonArray notes_array = doc.createNestedArray();
-      for (int i = 0; i < num_steps; i++) {
+      for (int i = 0; i < numsteps; i++) {
         int s = seqr.notes[p][j][i];
         notes_array.add(s);
       }
@@ -61,7 +48,7 @@ void gates_write() {
     DynamicJsonDocument doc(8192);  // assistant said 6144
     for (int j = 0; j < numtracks; j++) {
       JsonArray prob_array = doc.createNestedArray();
-      for (int i = 0; i < num_steps; i++) {
+      for (int i = 0; i < numsteps; i++) {
         int s = seqr.gates[p][j][i];
         prob_array.add(s);
       }
@@ -97,7 +84,7 @@ void probabilities_write() {
     DynamicJsonDocument doc(8192);  // assistant said 6144
     for (int j = 0; j < numtracks; j++) {
       JsonArray prob_array = doc.createNestedArray();
-      for (int i = 0; i < num_steps; i++) {
+      for (int i = 0; i < numsteps; i++) {
         int s = seqr.probs[p][j][i];
         prob_array.add(s);
       }
@@ -179,7 +166,7 @@ void velocities_write() {
     DynamicJsonDocument doc(8192);  // assistant said 6144
     for (int j = 0; j < numtracks; j++) {
       JsonArray vels_array = doc.createNestedArray();
-      for (int i = 0; i < num_steps; i++) {
+      for (int i = 0; i < numsteps; i++) {
         int s = seqr.vels[p][j][i];
         vels_array.add(s);
       }
@@ -219,7 +206,7 @@ void sequences_write() {
     DynamicJsonDocument doc(8192);  // assistant said 6144
     for (int j = 0; j < numtracks; j++) {
       JsonArray seq_array = doc.createNestedArray();
-      for (int i = 0; i < num_steps; i++) {
+      for (int i = 0; i < numsteps; i++) {
         int s = seqr.seqs[p][j][i];
         seq_array.add(s);
       }
@@ -261,7 +248,7 @@ void pattern_reset() {
     }
     for (int j = 0; j < numtracks; j++) {
       JsonArray seq_array = doc[j];
-      for (int i = 0; i < num_steps; i++) {
+      for (int i = 0; i < numsteps; i++) {
         seqr.seqs[p][j][i] = seq_array[i];
       }
     }
@@ -278,7 +265,7 @@ void pattern_reset() {
     }
     for (int j = 0; j < numtracks; j++) {
       JsonArray vel_array = doc2[j];
-      for (int i = 0; i < num_steps; i++) {
+      for (int i = 0; i < numsteps; i++) {
         seqr.vels[p][j][i] = vel_array[i];
       }
     }
@@ -295,7 +282,7 @@ void pattern_reset() {
     }
     for (int j = 0; j < numtracks; j++) {
       JsonArray note_array = docn[j];
-      for (int i = 0; i < num_steps; i++) {
+      for (int i = 0; i < numsteps; i++) {
         seqr.notes[p][j][i] = note_array[i];
       }
     }
@@ -349,7 +336,7 @@ void pattern_reset() {
     }
     for (int j = 0; j < numtracks; j++) {
       JsonArray prob_array = doc4[j];
-      for (int i = 0; i < num_steps; i++) {
+      for (int i = 0; i < numsteps; i++) {
         seqr.probs[p][j][i] = prob_array[i];
       }
     }
@@ -368,7 +355,7 @@ void pattern_reset() {
     }
     for (int j = 0; j < numtracks; j++) {
       JsonArray gate_array = doc5[j];
-      for (int i = 0; i < num_steps; i++) {
+      for (int i = 0; i < numsteps; i++) {
         seqr.gates[p][j][i] = gate_array[i];
       }
     }
@@ -409,7 +396,7 @@ void sequences_read() {
 
     for (int j = 0; j < numtracks; j++) {
       JsonArray seq_array = doc[j];
-      for (int i = 0; i < num_steps; i++) {
+      for (int i = 0; i < numsteps; i++) {
         seqr.seqs[p][j][i] = seq_array[i];
       }
     }
@@ -453,7 +440,7 @@ void velocities_read() {
 
     for (int j = 0; j < numtracks; j++) {
       JsonArray vel_array = doc[j];
-      for (int i = 0; i < num_steps; i++) {
+      for (int i = 0; i < numsteps; i++) {
         seqr.vels[p][j][i] = vel_array[i];
       }
     }
@@ -494,7 +481,7 @@ void notes_read() {
 
     for (int j = 0; j < numtracks; j++) {
       JsonArray note_array = doc[j];
-      for (int i = 0; i < num_steps; i++) {
+      for (int i = 0; i < numsteps; i++) {
         seqr.notes[p][j][i] = note_array[i];
       }
     }
@@ -537,7 +524,7 @@ void probabilities_read() {
 
     for (int j = 0; j < numtracks; j++) {
       JsonArray prob_array = doc[j];
-      for (int i = 0; i < num_steps; i++) {
+      for (int i = 0; i < numsteps; i++) {
         seqr.probs[p][j][i] = prob_array[i];
       }
     }
@@ -580,7 +567,7 @@ void gates_read() {
 
     for (int j = 0; j < numtracks; j++) {
       JsonArray gate_array = doc[j];
-      for (int i = 0; i < num_steps; i++) {
+      for (int i = 0; i < numsteps; i++) {
         seqr.gates[p][j][i] = gate_array[i];
       }
     }
@@ -673,5 +660,3 @@ void flash_store() {
     if (marci_debug) Serial.println(F("Mounted " D_FLASH " directory!"));
   }
 }
-
-#endif

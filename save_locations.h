@@ -1,14 +1,3 @@
-/**
- * save_locations.h -- Flash storage paths for Multitrack Sequencer (for Feather M4 Express)
- * Part of https://github.com/PatchworkBoy/Neotrellis-Gate-Sequencer
- * 04 Nov 2023 - @apatchworkboy / Marci
- * Based on https://github.com/todbot/picostepseq/
- * 28 Apr 2023 - @todbot / Tod Kurt
- * 15 Aug 2022 - @todbot / Tod Kurt
- */
-#ifndef MULTI_SEQUENCER_PATHS
-#define MULTI_SEQUENCER_PATHS
-
 // File locations
 const char pb1[] = "/M4SEQ32/saved_sequences.json";
 const char pb2[] = "/M4SEQ32/saved_sequences2.json";
@@ -103,5 +92,3 @@ const char settings_file[] = "/M4SEQ32/saved_settings.json";
 #include "saved_probabilities_json.h"
 #include "saved_gates_json.h"
 #include "saved_settings_json.h"
-
-#endif
