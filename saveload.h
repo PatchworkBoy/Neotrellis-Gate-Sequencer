@@ -43,6 +43,7 @@ void notes_write() {
       if (marci_debug) Serial.println(p);
     }
     nfile.close();
+    doc.clear();
     if (marci_debug) Serial.println(p);
   }
   if (marci_debug) Serial.println(F("notes saved"));
@@ -78,6 +79,7 @@ void gates_write() {
       if (marci_debug) Serial.println(p);
     }
     file.close();
+    doc.clear();
     if (marci_debug) Serial.print(F("Gate bank saved"));
     if (marci_debug) Serial.println(p);
     //serializeJson(doc, Serial);
@@ -114,6 +116,7 @@ void probabilities_write() {
       if (marci_debug) Serial.println(p);
     }
     file.close();
+    doc.clear();
     if (marci_debug) Serial.print(F("Probability Bank Saved"));
     if (marci_debug) Serial.println(p);
     //serializeJson(doc, Serial);
@@ -150,6 +153,15 @@ void settings_write() {
   for (uint8_t i = 0; i < 2; ++i) {
     set_array.add(hzv[i]);
   }
+  for (uint8_t i = 0; i < 8; ++i) {
+    set_array.add(seqr.divs[i]);
+  }
+  for (uint8_t i = 0; i < 8; ++i) {
+    set_array.add(seqr.offsets[i]);
+  }
+  for (uint8_t i = 0; i < 8; ++i) {
+    set_array.add(seqr.lengths[i]);
+  }
   toggle_write();
   fatfs.remove(settings_file);
   File32 file = fatfs.open(settings_file, FILE_WRITE);
@@ -161,6 +173,7 @@ void settings_write() {
     if (marci_debug) Serial.println(F("settings_write: Failed to write to file"));
   }
   file.close();
+  doc.clear();
   //if (marci_debug) Serial.print(F("saved_settings_json = \""));
   //serializeJson(doc, Serial);
   if (marci_debug) Serial.println(F("settings saved"));
@@ -195,6 +208,7 @@ void velocities_write() {
       if (marci_debug) Serial.println(p);
     }
     vfile.close();
+    doc.clear();
     if (marci_debug) Serial.println(p);
   }
   if (marci_debug) Serial.println(F("velocities saved"));
@@ -206,6 +220,8 @@ void sequences_write() {
   // save wear & tear on flash, only allow writes every 10 seconds
   if (millis() - last_sequence_write_millis < 10 * 1000) {  // only allow writes every 10 secs
     if (marci_debug) Serial.println(F("sequences_write: too soon, wait a bit more"));
+    trellis.setPixelColor(59, C127);
+    trellis.show();
     return;
   }
   last_sequence_write_millis = millis();
@@ -235,6 +251,7 @@ void sequences_write() {
       if (marci_debug) Serial.println(p);
     }
     pfile.close();
+    doc.clear();
     //if (marci_debug) Serial.print(F("saved_sequences_json = \""));
     //serializeJson(doc, Serial);
     if (marci_debug) Serial.println(F("sequence saved"));
@@ -262,6 +279,7 @@ void pattern_reset() {
       for (int i = 0; i < num_steps; i++) {
         seqr.seqs[p][j][i] = seq_array[i];
       }
+      doc.clear();
     }
   }
   if (marci_debug) Serial.println(F("vel_bank_resets"));
@@ -279,6 +297,7 @@ void pattern_reset() {
       for (int i = 0; i < num_steps; i++) {
         seqr.vels[p][j][i] = vel_array[i];
       }
+      doc2.clear();
     }
   }
   if (marci_debug) Serial.println(F("note_bank_resets"));
@@ -296,6 +315,7 @@ void pattern_reset() {
       for (int i = 0; i < num_steps; i++) {
         seqr.notes[p][j][i] = note_array[i];
       }
+      docn.clear();
     }
   }
   if (marci_debug) Serial.println(F("settings_reset"));
@@ -335,6 +355,19 @@ void pattern_reset() {
     hzv[i] = set_array[z];
     z++;
   }
+  for (uint8_t i = 0; i < 8; ++i) {
+    seqr.divs[i] = set_array[z];
+    z++;
+  }
+  for (uint8_t i = 0; i < 8; ++i) {
+    seqr.offsets[i] = set_array[z];
+    z++;
+  }
+  for (uint8_t i = 0; i < 8; ++i) {
+    seqr.lengths[i] = set_array[z];
+    z++;
+  }
+  doc3.clear();
   if (marci_debug) Serial.println(F("prob_bank_resets"));
   for (uint8_t p = 0; p < numpresets; ++p) {
     DynamicJsonDocument doc4(8192);  // assistant said 6144
@@ -350,6 +383,7 @@ void pattern_reset() {
       for (int i = 0; i < num_steps; i++) {
         seqr.probs[p][j][i] = prob_array[i];
       }
+      doc4.clear();
     }
   }
   if (marci_debug) Serial.println(F("gate_banks_reset"));
@@ -369,6 +403,7 @@ void pattern_reset() {
       for (int i = 0; i < num_steps; i++) {
         seqr.gates[p][j][i] = gate_array[i];
       }
+      doc5.clear();
     }
   }
   sequences_write();
@@ -407,14 +442,20 @@ void sequences_read() {
 
     for (int j = 0; j < numtracks; j++) {
       JsonArray seq_array = doc[j];
+      if (marci_debug) {
+          Serial.print("Preset "); 
+          Serial.print(p);
+          Serial.print(", Track ");
+          Serial.println(j);
+      }
       for (int i = 0; i < num_steps; i++) {
         seqr.seqs[p][j][i] = seq_array[i];
       }
     }
     pfile.close();
+    doc.clear();
     if (marci_debug) {
       Serial.println(F("Pattern Bank OK"));
-      Serial.println(p);
     }
   }
   if (marci_debug) Serial.println(F("All patterns loaded"));
@@ -450,13 +491,19 @@ void velocities_read() {
     }
 
     for (int j = 0; j < numtracks; j++) {
+      if (marci_debug) {
+          Serial.print("Preset "); 
+          Serial.print(p);
+          Serial.print(", Track ");
+          Serial.println(j);
+      }
       JsonArray vel_array = doc[j];
       for (int i = 0; i < num_steps; i++) {
         seqr.vels[p][j][i] = vel_array[i];
       }
     }
     file.close();
-    if (marci_debug) Serial.println(p);
+    doc.clear();
   }
   if (marci_debug) Serial.println(F("All velocities loaded"));
   trellis.show();
@@ -492,11 +539,18 @@ void notes_read() {
 
     for (int j = 0; j < numtracks; j++) {
       JsonArray note_array = doc[j];
+      if (marci_debug) {
+          Serial.print("Preset "); 
+          Serial.print(p);
+          Serial.print(", Track ");
+          Serial.println(j);
+      }
       for (int i = 0; i < num_steps; i++) {
         seqr.notes[p][j][i] = note_array[i];
       }
     }
     file.close();
+    doc.clear();
     if (marci_debug) Serial.println(p);
   }
   if (marci_debug) Serial.println(F("All notes loaded"));
@@ -534,12 +588,19 @@ void probabilities_read() {
     }
 
     for (int j = 0; j < numtracks; j++) {
+      if (marci_debug) {
+          Serial.print("Preset "); 
+          Serial.print(p);
+          Serial.print(", Track ");
+          Serial.println(j);
+      }
       JsonArray prob_array = doc[j];
       for (int i = 0; i < num_steps; i++) {
         seqr.probs[p][j][i] = prob_array[i];
       }
     }
     file.close();
+    doc.clear();
     if (marci_debug) Serial.println(p);
   }
   if (marci_debug) Serial.println(F("All Probabilities loaded"));
@@ -578,12 +639,18 @@ void gates_read() {
 
     for (int j = 0; j < numtracks; j++) {
       JsonArray gate_array = doc[j];
+      if (marci_debug) {
+          Serial.print("Preset "); 
+          Serial.print(p);
+          Serial.print(", Track ");
+          Serial.println(j);
+      }
       for (int i = 0; i < num_steps; i++) {
         seqr.gates[p][j][i] = gate_array[i];
       }
     }
     file.close();
-    if (marci_debug) Serial.println(p);
+    doc.clear();
   }
   if (marci_debug) Serial.println(F("All gates loaded"));
   trellis.show();
@@ -617,34 +684,95 @@ void settings_read() {
 
   JsonArray set_array = doc[0];
   tempo = set_array[0];
+  if (marci_debug) Serial.println("Loading Stepsize");
   cfg.step_size = set_array[1];
+  if (marci_debug) Serial.println("Loading Transpose");
   transpose = set_array[2];
   uint8_t z = 3;
+  if (marci_debug) Serial.println("Loading Track_notes");
   for (uint8_t i = 0; i < 8; ++i) {
     seqr.track_notes[i] = set_array[z];
     z++;
   }
+  if (marci_debug) Serial.println("Loading Ctrl_Notes");
   for (uint8_t i = 0; i < 3; ++i) {
     seqr.ctrl_notes[i] = set_array[z];
     z++;
   }
+  if (marci_debug) Serial.println("Loading Track Channels");
   for (uint8_t i = 0; i < 8; ++i) {
     seqr.track_chan[i] = set_array[z];
     z++;
   }
+  if (marci_debug) Serial.println("Loading Ctrl Channel");
   seqr.ctrl_chan = set_array[z] > 0 ? set_array[z] : seqr.ctrl_chan;
+  if (marci_debug) Serial.println("Loading Swing");
   seqr.swing = set_array[z + 1] > 0 ? set_array[z + 1] : seqr.swing;
+  if (marci_debug) Serial.println("Loading Brightness");
   brightness = set_array[z + 2] > 0 ? set_array[z + 2] : brightness;
   z = z + 3;
+  if (marci_debug) Serial.println("Loading Modes");
   for (uint8_t i = 0; i < 8; ++i) {
+    if (marci_debug) {
+      Serial.print(i);
+      Serial.print( " = " );
+    }
     seqr.modes[i] = set_array[z] > 0 ? set_array[z] : TRIGATE;
     z++;
+    if (marci_debug) {
+      Serial.println(seqr.modes[i]);
+    }
   }
+  if (marci_debug) Serial.println("Loading vOct / HzV");
   for (uint8_t i = 0; i < 2; ++i) {
+    if (marci_debug) {
+      Serial.print(i);
+      Serial.print( " = " );
+    }
     hzv[i] = set_array[z];
     z++;
+    if (marci_debug) {
+      Serial.println(hzv[i]);
+    }
+  }
+  if (marci_debug) Serial.println("Loading Divisions");
+  for (uint8_t i = 0; i < 8; ++i) {
+    if (marci_debug) {
+      Serial.print(i);
+      Serial.print( " = " );
+    }
+    seqr.divs[i] = set_array[z];
+    z++;
+    if (marci_debug) {
+      Serial.println(seqr.divs[i]);
+    }
+  }
+  if (marci_debug) Serial.println("Loading Offsets");
+  for (uint8_t i = 0; i < 8; ++i) {
+    if (marci_debug) {
+      Serial.print(i);
+      Serial.print( " = " );
+    }
+    seqr.offsets[i] = set_array[z];
+    z++;
+    if (marci_debug) {
+      Serial.println(seqr.offsets[i]);
+    }
+  }
+  if (marci_debug) Serial.println("Loading Lengths");
+  for (uint8_t i = 0; i < 8; ++i) {
+    if (marci_debug) {
+      Serial.print(i);
+      Serial.print( " = " );
+    }
+    seqr.lengths[i] = set_array[z];
+    z++;
+    if (marci_debug) {
+      Serial.println(seqr.lengths[i]);
+    }
   }
   file.close();
+  doc.clear();
   if (marci_debug) Serial.println("All settings loaded");
   trellis.show();
 }

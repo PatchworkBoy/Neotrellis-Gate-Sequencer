@@ -8,6 +8,6 @@
  * 15 Aug 2022 - @todbot / Tod Kurt
  */
 
-// Tempo(1) & StepSize(1) & Transpose(1), Notes(8), CtrlNotes(3), Channels(9 (8 tracks + control)), Swing(1), Brightness(1), Modes(8), HzV(2)
+// Tempo(1) & StepSize(1) & Transpose(1), Track_Notes(8), CtrlNotes(3), Channels(9 (8 tracks + control)), Swing(1), Brightness(1), Modes(8), HzV(2), Divisions(8), Offsets(8), Lengths(8)
 
-const char settings[] = "[[120,6,0,36,37,38,39,40,41,42,43,12,13,14,1,1,1,1,2,3,4,5,16,0,50,0,0,0,0,0,0,0,0,0,0]]";
+const char settings[] = "[[120,6,0,36,37,38,39,40,41,42,43,12,13,14,1,1,1,1,2,3,4,5,16,0,50,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,31,31,31,31,31,31,31,31]]";

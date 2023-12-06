@@ -37,9 +37,9 @@ const bool midi_in_debug = false;
 const bool marci_debug = false;
 
 // If you've wired TRS/DIN to TX pin then set to true:
-const bool serial_midi = false;
+const bool serial_midi = true;
 // If you've wired TRS sockets & resistors to gatepins & DACs (see ln 74 & 75), set to true:
-const bool analog_feats = false;
+const bool analog_feats = true;
 
 // HOW BIG IS YOUR TRELLIS?
 #define Y_DIM 8  //number of rows of key
