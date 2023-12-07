@@ -5,6 +5,12 @@ An 8 track 32 step MIDI (over USB) & Analog note/modulation/gate/trigger sequenc
 16 storable preset patterns per track (all layers stored). Customisable note-per-track (Trigger/Gate mode) and channel-per-track.
 Tracks 5 thru 8 can be assigned as arpeggiators for live arpeggiation of incoming MIDI notes / chords.
 
+Designed for use with the Adafruit 8x8 Neotrellis Feather M4 Kit, no additional hardware required - 
+- US:  https://www.adafruit.com/product/1929
+- UK: https://thepihut.com/products/adafruit-untztrument-open-source-8x8-grid-controller-kit-8x8-white-leds
+
+Adapted from https://github.com/todbot/picostepseq/
+
 3 octave CV (v/oct, switchable to 2 octave Hz/V) Output for track 7 & 8 on pins A0 & A1 when tracks in CC or NOTE.
 Track 1-8 Gates always output on digital io pins D4/5/6/9/10/11/12/13 (sending a 0-3.2v trigger/gate).
 
@@ -13,15 +19,9 @@ Analog CV/Gate outputs are NOT regulated or protected in any way. Whack a 1k res
 ## INSTALLATION
  If, after uploading, your Neotrellis appears blank, it's because the Feather M4's QSPI Flash isn't formatted. Quickest way to do this is double tap the upload button so FEATHERBOOT shows up on your desktop, grab latest circuitpython UF2 (from https://circuitpython.org/board/feather_m4_express/) and throw that onto it and wait for board to reboot, then kick it back into upload mode with a button double tap, reupload the sequencer firmware via Arduino IDE. (CircuitPython install formats the flash by coincidence much quicker than doing the SDFat example)
 
-Adapted from https://github.com/todbot/picostepseq/
+## NeoTrellis Surface
 
-Designed for use with the Adafruit 8x8 Neotrellis Feather M4 Kit, no additional hardware required - 
-- US:  https://www.adafruit.com/product/1929
-- UK: https://thepihut.com/products/adafruit-untztrument-open-source-8x8-grid-controller-kit-8x8-white-leds
-
-NeoTrellis Surface...
-
-[![Neotrellis Keys](https://apatchworkboy.com/wp-content/uploads/2023/11/Screenshot-2023-11-12-at-00.12.05.png)](https://apatchworkboy.com/wp-content/uploads/2023/12/Screenshot-2023-12-07-at-20.57.29.png)
+[![Neotrellis Keys](https://apatchworkboy.com/wp-content/uploads/2023/12/Screenshot-2023-12-07-at-20.57.29.png)](https://apatchworkboy.com/wp-content/uploads/2023/12/Screenshot-2023-12-07-at-20.57.29.png)
 
 - Row 1 - 4: Steps 1 thru 32 (pattern edit: on/off, velocity edit: cycle thru velocity 40 / 80 / 127, Length: select end step, Probability: 10% - 100% in 10% increments)
 - Row 5: Track Select - Trk1 | Trk2 | Trk3 | Trk4 | Trk5 | Trk6 | Trk7 | Trk8
