@@ -36,9 +36,7 @@ const bool midi_out_debug = false;
 const bool midi_in_debug = false;
 const bool marci_debug = false;
 
-// If you've wired TRS/DIN to TX pin then set to true:
 const bool serial_midi = true;
-// If you've wired TRS sockets & resistors to gatepins & DACs (see ln 74 & 75), set to true:
 const bool analog_feats = true;
 
 // HOW BIG IS YOUR TRELLIS?
@@ -471,7 +469,7 @@ void toggle_selected(uint8_t keyId) {
   }
 }
 
-void show_sequence(uint8_t seq) {
+void show_sequence(uint8_t& seq) {
   patedit = 1;
   for (uint8_t i = 0; i < num_steps; ++i) {
     trellis.setPixelColor(i, seqr.seqs[seqr.presets[seq - 1]][seq - 1][i] > 0 ? seq_col(sel_track) : 0);
@@ -485,7 +483,7 @@ void set_gate(uint8_t gid, uint8_t stp, int c) {
   if (!seqr.playing) { trellis.show(); }
 }
 
-void show_gates(uint8_t seq) {
+void show_gates(uint8_t& seq) {
   gateedit = 1;
   uint8_t gateId = seq - 1;
   uint32_t col = 0;
@@ -495,7 +493,7 @@ void show_gates(uint8_t seq) {
   if (!seqr.playing) { trellis.show(); }
 }
 
-void show_probabilities(uint8_t seq) {
+void show_probabilities(uint8_t& seq) {
   probedit = 1;
   uint32_t col = 0;
   for (uint8_t i = 0; i < num_steps; ++i) {
@@ -505,7 +503,7 @@ void show_probabilities(uint8_t seq) {
   if (!seqr.playing) { trellis.show(); }
 }
 
-void show_accents(uint8_t seq) { // velocities
+void show_accents(uint8_t& seq) { // velocities
   uint8_t trk_arr = sel_track - 1;
   veledit = 1;
   uint32_t col = 0;
@@ -521,7 +519,7 @@ void show_accents(uint8_t seq) { // velocities
   if (!seqr.playing) { trellis.show(); }
 }
 
-void show_notes(uint8_t seq) {
+void show_notes(uint8_t& seq) {
   uint8_t trk_arr = sel_track - 1;
   notesedit = 1;
   uint32_t col = 0;
@@ -576,7 +574,7 @@ void transpose_led() {
 }
 
 // Update Channel Config MODE buttons
-void mode_leds(uint8_t track) {
+void mode_leds(uint8_t& track) {
   for (uint8_t i = X_DIM * 3; i < num_steps; ++i) {
     trellis.setPixelColor(i, 0);
   }
@@ -616,7 +614,7 @@ void mode_leds(uint8_t track) {
 }
 
 // Initialise Channel Config display...
-void init_chan_conf(uint8_t track) {
+void init_chan_conf(uint8_t& track) {
   for (uint8_t i = 0; i < num_steps; ++i) {
     trellis.setPixelColor(i, 0);
   }
@@ -1425,7 +1423,7 @@ TrellisCallback onKey(keyEvent evt) {
             break;
           case 59: // WRITE
             if (chanedit == 0) {
-              trellis.setPixelColor(59, R127);
+              trellis.setPixelColor(59, P80);
               sequences_write();
             }
             break;

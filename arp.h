@@ -18,7 +18,7 @@ class Arp {
     std::vector<uint8_t> octpitches;
     byte _sequencePattern;
     byte _octaves;
-    int _step;
+    short int _step;
     uint8_t _maxSteps;
     uint8_t _pitchOut;
 
@@ -26,7 +26,7 @@ class Arp {
     std::vector<uint8_t> pitches;
     byte _sequencePattern = 1;
     byte _octaves = 1;
-    int _step = 0;
+    short int _step = 0;
     uint8_t _maxSteps = 0;
     uint8_t _pitchOut = 0.0f;
     pitches.reserve(capacity); //realistically should never end up larger than 10;
@@ -140,7 +140,7 @@ class Arp {
     return result;
   }
 
-  void setStep(int nextStep, int numberOfPitches) {
+  void setStep(short int nextStep, int numberOfPitches) {
     if (marci_debug) Serial.println("setStep");
     this->_step = nextStep;
     this->_maxSteps = numberOfPitches;
@@ -161,7 +161,7 @@ class Arp {
     }
   }
 
-  void NoteOn(uint8_t note){
+  void NoteOn(uint8_t& note){
     uint8_t numberOfPitches = pitches.size();
     if (marci_debug) {
       Serial.println("Adding note to stack");
@@ -192,7 +192,7 @@ class Arp {
     }
   }
 
-  void NoteOff(uint8_t note){
+  void NoteOff(uint8_t& note){
     uint8_t numberOfPitches = pitches.size();
     if (numberOfPitches != 0) {
       if (marci_debug) {

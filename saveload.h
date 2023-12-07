@@ -218,28 +218,41 @@ void velocities_write() {
 // write all sequences to "disk"
 void sequences_write() {
   // save wear & tear on flash, only allow writes every 10 seconds
-  if (millis() - last_sequence_write_millis < 10 * 1000) {  // only allow writes every 10 secs
+  if ((millis() - last_sequence_write_millis) < (10 * 1000)) {  // only allow writes every 10 secs
     if (marci_debug) Serial.println(F("sequences_write: too soon, wait a bit more"));
     trellis.setPixelColor(59, C127);
     trellis.show();
     return;
   }
+  if (marci_debug) Serial.println(F("millis ok"));
   last_sequence_write_millis = millis();
+  if (marci_debug) Serial.println(F("key color"));
   trellis.setPixelColor(59, R127);
+  if (marci_debug) Serial.println(F("show done"));
   trellis.show();
   if (marci_debug) Serial.println(F("sequences_write"));
   for (uint8_t p = 0; p < numpresets; ++p) {
     if (marci_debug) Serial.println(p);
     DynamicJsonDocument doc(8192);  // assistant said 6144
-    for (int j = 0; j < numtracks; j++) {
+    for (uint8_t j = 0; j < numtracks; j++) {
+      if (marci_debug) Serial.println(j);
       JsonArray seq_array = doc.createNestedArray();
-      for (int i = 0; i < num_steps; i++) {
-        int s = seqr.seqs[p][j][i];
+      for (uint8_t i = 0; i < num_steps; i++) {
+        if (marci_debug) {
+          Serial.print(i);
+          Serial.print(" = ");
+          Serial.println(seqr.seqs[p][j][i]);
+        }
+        auto s = seqr.seqs[p][j][i];
         seq_array.add(s);
       }
     }
+    if (marci_debug) Serial.println(F("sequences buffered to doc"));
+    if (marci_debug) Serial.println(F("led flash"));
     toggle_write();
+    if (marci_debug) Serial.println(F("remove old file"));
     fatfs.remove(pfiles[p]);
+    if (marci_debug) Serial.println(F("create new file"));
     File32 pfile = fatfs.open(pfiles[p], FILE_WRITE);
     if (!pfile) {
       if (marci_debug) Serial.println(F("sequences_write: Failed to create file"));
@@ -250,7 +263,9 @@ void sequences_write() {
       if (marci_debug) Serial.println(F("sequences_write: Failed to write to file"));
       if (marci_debug) Serial.println(p);
     }
+    if (marci_debug) Serial.println(F("stored!"));
     pfile.close();
+    if (marci_debug) Serial.println(F("clear buffer"));
     doc.clear();
     //if (marci_debug) Serial.print(F("saved_sequences_json = \""));
     //serializeJson(doc, Serial);

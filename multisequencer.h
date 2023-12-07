@@ -71,24 +71,24 @@ public:
   uint32_t held_gate_millis[tracks];
   uint32_t held_gate_notes[tracks];
   uint32_t held_gate_chans[tracks];
-  int multistepi[tracks];
+  short int multistepi[tracks];
   int outcomes[tracks];
   int lengths[tracks];
   int offsets[tracks];
   int ticks_per_step;  // expected values: 6 = 1/16th, 12 = 1/8, 24 = 1/4,
-  int ticki;           // which midi clock we're on
-  int stepi;           // which sequencer step we're on
+  short int ticki;           // which midi clock we're on
+  short int stepi;           // which sequencer step we're on
   int seqno;
   int length;
   int transpose;
-  uint8_t divcounts[tracks];
+  short int divcounts[tracks];
   uint8_t divs[tracks];
   uint8_t gates[_presets][tracks][_steps];
   uint8_t notes[_presets][tracks][_steps];
   uint8_t presets[_presets];
   uint8_t probs[_presets][tracks][_steps];
   uint8_t vels[_presets][tracks][_steps];
-  uint8_t laststeps[tracks];
+  short int laststeps[tracks];
   uint8_t track_notes[tracks];  // C2 thru G2
   uint8_t ctrl_notes[3];
   uint8_t track_chan[tracks];
@@ -97,7 +97,7 @@ public:
   uint8_t ctrl_chan = 16;
   uint8_t laststep;
   uint8_t swing;
-  uint8_t pos;
+  short int pos;
   bool analog_io;
   bool mutes[tracks];
   bool seqs[_presets][tracks][_steps];
@@ -441,16 +441,17 @@ public:
     pos = -1;
     if (!playing) {
       resetflag = 1;
-      disp_func();
+      //disp_func();
     } else {
       ticki = 0;
     }
-    for (uint8_t s = 0; s <= 7; s++) {
+    for (uint8_t s = 0; s < numtracks; ++s) {
       multistepi[s] = -1;
       divcounts[s] = -1;
       laststeps[s] = -1;
       if (s <= _arps) {
-        arps[s]._step = -1;
+        // FIXME: setting this to -1 causes hard crash when saving. I have NO idea why... even calling a seperate function to specifically set it to 0 before save doesn't work.  *shrug*
+        arps[s]._step = 0;
       }
     }
     on_func(ctrl_notes[2], 127, 5, true, ctrl_chan);
