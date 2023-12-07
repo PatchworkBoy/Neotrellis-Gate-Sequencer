@@ -48,6 +48,8 @@ void notes_write() {
   }
   if (marci_debug) Serial.println(F("notes saved"));
   sure = 0;
+  presetmode = 0;
+  divedit = 0 ;
   init_interface();
   show_sequence(sel_track);
 }
