@@ -21,7 +21,7 @@ Designed for use with the Adafruit 8x8 Neotrellis Feather M4 Kit, no additional 
 
 NeoTrellis Surface...
 
-![Neotrellis Keys](https://apatchworkboy.com/wp-content/uploads/2023/11/Screenshot-2023-11-12-at-00.12.05.png)
+![Neotrellis Keys]([https://apatchworkboy.com/wp-content/uploads/2023/11/Screenshot-2023-11-12-at-00.12.05.png](https://apatchworkboy.com/wp-content/uploads/2023/12/Screenshot-2023-12-07-at-20.57.29.png)
 
 - Row 1 - 4: Steps 1 thru 32 (pattern edit: on/off, velocity edit: cycle thru velocity 40 / 80 / 127, Length: select end step, Probability: 10% - 100% in 10% increments)
 - Row 5: Track Select - Trk1 | Trk2 | Trk3 | Trk4 | Trk5 | Trk6 | Trk7 | Trk8
