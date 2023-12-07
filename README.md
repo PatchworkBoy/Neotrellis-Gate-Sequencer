@@ -10,7 +10,7 @@ Track 1-8 Gates always output on digital io pins D4/5/6/9/10/11/12/13 (sending a
 
 Analog CV/Gate outputs are NOT regulated or protected in any way. Whack a 1k resistor between pin and 3.5mm TRS socket tip. Analog output is merely proof of concept. There's something squonky going on with the Feather M4's DACs (when used with my Neutron and K2) where they cannot hold an output voltage for long unless retriggered. Keep Release of your gates short, else you'll hear drift-down to 0v oddities.
 
-##INSTALLATION
+## INSTALLATION
  If, after uploading, your Neotrellis appears blank, it's because the Feather M4's QSPI Flash isn't formatted. Quickest way to do this is double tap the upload button so FEATHERBOOT shows up on your desktop, grab latest circuitpython UF2 and throw that onto it and wait for board to reboot, then kick it back into upload mode with a button double tap, reupload the sequencer firmware via Arudino IDE. (CircuitPython install formats the flash by coincidence much quicker than doing the SDFat example)
 
 Adapted from https://github.com/todbot/picostepseq/
